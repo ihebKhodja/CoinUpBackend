@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36705.20 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoinUp.Shared", "CoinUp.Shared\CoinUp.Shared.csproj", "{4832CEBD-5176-211F-4706-1D6E89F26859}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoinUpWorkerService", "CoinUpWorkerService\CoinUpWorkerService.csproj", "{26541C30-313D-C35F-970C-34AD91FBA502}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoinUpAPI", "CoinUpAPI\CoinUpAPI.csproj", "{A2C01753-C143-676B-969D-1B8B63333C59}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4832CEBD-5176-211F-4706-1D6E89F26859}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4832CEBD-5176-211F-4706-1D6E89F26859}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4832CEBD-5176-211F-4706-1D6E89F26859}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4832CEBD-5176-211F-4706-1D6E89F26859}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26541C30-313D-C35F-970C-34AD91FBA502}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26541C30-313D-C35F-970C-34AD91FBA502}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26541C30-313D-C35F-970C-34AD91FBA502}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26541C30-313D-C35F-970C-34AD91FBA502}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2C01753-C143-676B-969D-1B8B63333C59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2C01753-C143-676B-969D-1B8B63333C59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2C01753-C143-676B-969D-1B8B63333C59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2C01753-C143-676B-969D-1B8B63333C59}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A89F15C8-B20B-44D6-9DDE-CED303CA9985}
+	EndGlobalSection
+EndGlobal

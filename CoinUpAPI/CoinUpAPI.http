@@ -1,0 +1,6 @@
+@CoinUpAPI_HostAddress = http://localhost:5269
+
+GET {{CoinUpAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
