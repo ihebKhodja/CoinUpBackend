@@ -1,38 +1,5 @@
 ## Architecture Diagram
 
-```mermaid
-flowchart TB
+<img width="934" height="635" alt="image" src="https://github.com/user-attachments/assets/46eb061e-7da4-49f2-bcda-93d601d6289e" />
 
-  subgraph Frontend
-    ANG[Angular Web App]
-  end
-
-  subgraph Backend
-    API[.NET 8 Web API]
-    WORKER[.NET 8 WorkerService]
-  end
-
-  subgraph Messaging
-    MQ[(RabbitMQ)]
-  end
-
-  subgraph Database
-    SQL[(SQL Server)]
-  end
-
-  subgraph Monitoring
-    PROM[Prometheus]
-    GRAF[Grafana]
-  end
-
-  ANG -->|REST / WebSocket| API
-  API -->|Queries| SQL
-  API -->|Consume events| MQ
-  WORKER -->|Insert market data| SQL
-  WORKER -->|Publish events| MQ
-
-  API --> PROM
-  WORKER --> PROM
-  PROM --> GRAF
-```
 
