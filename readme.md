@@ -1,6 +1,6 @@
 ## Architecture Diagram
 
-```mermaid
+mermaid
 flowchart TB
   subgraph Frontend
     ANG[Angular Web App]
