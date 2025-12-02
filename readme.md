@@ -1,5 +1,6 @@
 ## Architecture Diagram
 
+```mermaid
 flowchart TB
 
   subgraph Frontend
@@ -33,3 +34,5 @@ flowchart TB
   API --> PROM
   WORKER --> PROM
   PROM --> GRAF
+```
+
