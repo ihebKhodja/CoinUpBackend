@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph API ["REST API"]
+        subgraph Auth["AuthController (/api/auth)"]
+            A1["POST /register"]
+            A2["POST /login"]
+            A3["POST /refresh-token"]
+        end
+
+        subgraph Coins["CoinsController (/api/coins)"]
+            C1["GET /"] 
+            C2["GET /:id"]
+            C3["GET /market"] 
+            C4["GET /:id/chart"]
+        end
+
+        subgraph Wallet["WalletController (/api/wallet)"]
+            W1["GET /portfolio"]
+            W2["POST /buy"]
+            W3["POST /sell"]
+            W4["GET /transactions"]
+            W5["GET /watchlist"]
+            W6["POST /watchlist"]
+            W7["DELETE /watchlist/:id"]
+        end
+
+        subgraph Admin["Admin/MarketJobs"]
+            J1["MarketUpdaterService (background)"]
+            J2["MarketChartUpdater"]
+        end
+    end
+
+    Client-->|HTTP|Auth
+    Client-->|HTTP|Coins
+    Client-->|HTTP|Wallet
+    admin-->J1
+    J1-->Coins
+    J1-->MarketChartDetails

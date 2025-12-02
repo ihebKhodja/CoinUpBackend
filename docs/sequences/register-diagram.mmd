@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant C as Client
+    participant API as AuthController
+    participant S as UserService
+    participant DB as Database
+
+    C->>API: POST /api/auth/register {username,email,password}
+    API->>S: CreateUser(dto)
+    S->>DB: INSERT User (hash password)
+    DB-->>S: OK (userId)
+    S-->>API: User created
+    API-->>C: 201 Created (maybe return JWT or success)

@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant C as Client
+    participant API as WalletController
+    participant Auth as JwtFilter
+    participant WS as WalletService
+    participant Coin as CoinsService
+    participant DB as Database
+
+    C->>API: POST /api/wallet/buy {coinId, quantity}
+    API->>Auth: validate token
+    Auth-->>API: userId
+    API->>Coin: GetCurrentPrice(coinId)
+    Coin-->>API: price
+    API->>WS: Buy(userId, coinId, quantity, price)
+    WS->>DB: BeginTransaction
+    WS->>DB: SELECT Wallet WHERE UserId
+    DB-->>WS: wallet
+    WS->>DB: verify wallet.Balance >= price*quantity
+    alt sufficient balance
+        WS->>DB: INSERT/UPDATE CoinHolding (adjust quantity, avg price)
+        WS->>DB: INSERT WalletTransaction (Buy)
+        WS->>DB: UPDATE Wallet SET Balance = Balance - cost
+        DB-->>WS: OK
+        WS->>DB: Commit
+        WS-->>API: success
+        API-->>C: 200 {holding, newBalance}
+    else insufficient
+        WS->>DB: Rollback
+        WS-->>API: error (402 or 400)
+        API-->>C: 400 Insufficient funds
+    end

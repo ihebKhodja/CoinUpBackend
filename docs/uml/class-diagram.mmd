@@ -1,0 +1,108 @@
+classDiagram
+    %% Domain classes
+    class User {
+        +string Id
+        +string Username
+        +string Email
+        +string PasswordHash
+        +DateTime CreatedAt
+        +EWallet Wallet
+    }
+
+    class EWallet {
+        +string Id
+        +string UserId
+        +decimal Balance
+        +List~CoinHolding~ Holdings
+    }
+
+    class CoinHolding {
+        +string Id
+        +string WalletId
+        +string CoinId
+        +decimal Quantity
+        +decimal AverageBuyPrice
+        +DateTime LastUpdated
+        +decimal CurrentValue (NotMapped)
+        +decimal Profit (NotMapped)
+    }
+
+    class WalletTransaction {
+        +string Id
+        +string WalletId
+        +string CoinId
+        +TransactionType Type
+        +decimal Quantity
+        +decimal PriceAtOperation
+        +DateTime Timestamp
+    }
+
+    class WatchlistItem {
+        +string Id
+        +string UserId
+        +string CoinId
+        +DateTime AddedAt
+    }
+
+    class PortfolioSnapshot {
+        +string Id
+        +string UserId
+        +decimal TotalValue
+        +DateTime CreatedAt
+    }
+
+    class CoinsMarket {
+        +string Id
+        +string Symbol
+        +int Rank
+        +string Name
+        +string Image
+        +decimal Current_Price
+        +decimal? Market_Cap
+        +int Market_Cap_Rank
+        +decimal Total_Volume
+        +decimal High_24h
+        +decimal Low_24h
+        +decimal Price_Change_24h
+        +DateTime Last_Updated
+    }
+
+    class MarketInfo {
+        +string Id
+        +string Name
+        +double MarketCap
+        +double MarketCapChange24h
+        +string Content
+        +List~string~ Top3CoinsId
+        +double Volume24h
+        +DateTime UpdatedAt
+    }
+
+    class MarketChartDetails {
+        +string Id
+        +int Rank
+        +string PricesJson
+        +string MarketCapsJson
+        +string TotalVolumesJson
+        +List~List~decimal~~ Prices (NotMapped)
+        +List~List~decimal~~ MarketCaps (NotMapped)
+        +List~List~decimal~~ TotalVolumes (NotMapped)
+    }
+
+    %% Enums / simple types
+    class TransactionType {
+        <<enumeration>>
+        +Buy
+        +Sell
+    }
+
+    %% Relationships
+    User "1" -- "1" EWallet : has
+    EWallet "1" -- "*" CoinHolding : holds
+    EWallet "1" -- "*" WalletTransaction : transactions
+    User "1" -- "*" WatchlistItem : watches
+    User "1" -- "*" PortfolioSnapshot : snapshots
+    CoinHolding --> CoinsMarket : references
+    WalletTransaction --> CoinsMarket : snapshot
+    WatchlistItem --> CoinsMarket : references
+                

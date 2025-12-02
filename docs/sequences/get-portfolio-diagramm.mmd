@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant C as Client
+    participant API as PortfolioController
+    participant Auth as JwtFilter
+    participant WS as WalletService
+    participant Coin as CoinsService
+    participant DB as Database
+
+    C->>API: GET /api/wallet/portfolio
+    API->>Auth: validate token
+    Auth-->>API: userId
+    API->>WS: GetPortfolio(userId)
+    WS->>DB: SELECT Wallet, CoinHoldings WHERE userId
+    DB-->>WS: wallet + holdings
+    WS->>Coin: GetCurrentPrices(list of coinIds)
+    Coin-->>WS: current prices
+    WS->>WS: compute per-holding currentValue, profit, total
+    WS-->>API: portfolio dto
+    API-->>C: 200 {holdings, totalValue, totalProfit}
