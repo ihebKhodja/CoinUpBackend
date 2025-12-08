@@ -1,12 +1,13 @@
 ﻿using CoinUp.Shared.Models;
+using CoinUpAPI.Dto;
 
 namespace CoinUpAPI.Services
 {
     public interface IWatchlistService
     {
-        Task AddAsync(string userId, string coinId);
-        Task RemoveAsync(string userId, string coinId);
-        Task<IEnumerable<CoinsMarket>> GetAsync(string userId);
+        Task<WatchlistItemDto?> AddAsync(string userId, string coinId);
+        Task<WatchlistItemDto?> RemoveAsync(string userId, string coinId);
+        Task<List<WatchlistItemDto>> GetAsync(string userId);
     }
 
 }

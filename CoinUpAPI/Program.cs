@@ -16,6 +16,7 @@ builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<ICoinsService, CoinsService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
 // JWT authentication
 builder.Services.AddAuthentication(options =>
