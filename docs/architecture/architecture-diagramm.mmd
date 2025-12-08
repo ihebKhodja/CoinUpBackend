@@ -1,0 +1,49 @@
+flowchart LR
+
+    subgraph CLIENT ["Frontend Layer"]
+        A["Angular App<br/>UI/UX"]
+    end
+
+    subgraph API ["Backend API Layer (.NET API)"]
+        B["REST API<br/>ASP.NET Core"]
+        C["Authentication<br/>JWT / Identity"]
+        D["Controllers + Services"]
+        E["Database Access<br/>EF Core"]
+    end
+
+    subgraph MESSAGE_BROKER ["Message Broker"]
+        F["RabbitMQ<br/>Exchange + Queues"]
+    end
+
+    subgraph WORKER ["Background Processing Layer"]
+        G[".NET Worker Service"]
+        H["Jobs: Coin Fetching, Market Data, Scheduler"]
+        I["Consumer: RabbitMQ Subscriber"]
+    end
+
+    subgraph DATA ["Data Storage"]
+        J["SQL Database<br/>PostgreSQL / SQLServer"]
+    end
+
+    %% Client → API
+    A -->|HTTP/REST| B
+    A -->|JWT Auth| C
+
+    %% API internal
+    B --> D
+    D --> E
+    E --> J
+
+    %% API triggers worker via messages
+    D -->|Publish tasks| F
+
+    %% Worker consumes from RabbitMQ
+    F --> I
+    I --> G
+    G --> H
+
+    %% Worker updates DB
+    H --> J
+
+    %% API reads updated DB for Angular
+    J --> E --> D --> B --> A

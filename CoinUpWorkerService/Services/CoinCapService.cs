@@ -135,7 +135,7 @@ namespace CoinUpWorkerService.Services
             return result;
         }
 
-        public async Task<MarketChartDetails?> FetchMarketChartAsync(string id, int rank)
+        public async Task<MarketChartDetails?> FetchMarketChartAsync(string id, int rank, int days)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Id is required", nameof(id));
@@ -143,7 +143,7 @@ namespace CoinUpWorkerService.Services
             try
             {
                 string endpoint =
-                    $"coins/{id}/market_chart?vs_currency=usd&days=365";
+                    $"coins/{id}/market_chart?vs_currency=usd&days={days}";
 
                 var json = await _httpClient.GetFromJsonAsync<JsonElement>(endpoint);
 

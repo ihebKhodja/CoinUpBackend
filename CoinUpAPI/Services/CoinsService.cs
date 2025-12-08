@@ -108,6 +108,13 @@ namespace CoinUpAPI.Services
                 AtlDate = coin.Atl_Date
             };
         }
+        public async Task<decimal> GetCurrentPriceAsync(string coinId)
+        {
+            var coin = await _dbContext.CoinsMarket.FirstOrDefaultAsync(c => c.Id == coinId);
+            if (coin == null) throw new Exception("Coin not found");
+
+            return coin.Current_Price;
+        }
     }
 
 }

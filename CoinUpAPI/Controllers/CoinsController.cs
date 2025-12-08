@@ -1,16 +1,15 @@
 ﻿using CoinUpAPI.Data;
 using CoinUpAPI.Dto;
 using CoinUpAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinUpAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-
-
-
     public class CoinsController : ControllerBase
     {
         private readonly ICoinsService _coinsService;
