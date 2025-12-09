@@ -100,7 +100,8 @@ namespace CoinUpWorkerService.Jobs
                     {
                         try
                         {
-                            var chart = await collector.FetchMarketChartAsync(coin.Id, coin.Rank);
+                            var days = 365;
+                            var chart = await collector.FetchMarketChartAsync(coin.Id, coin.Rank, days);
 
                             if (chart == null)
                             {

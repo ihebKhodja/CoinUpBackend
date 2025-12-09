@@ -1,0 +1,40 @@
+# version: '4.0'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      # SA_PASSWORD: "YourStrong!Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserverdata:/var/opt/mssql
+
+  coinupapi:
+    build:
+      context: .
+      dockerfile: CoinUpAPI/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - sqlserver
+    ports:
+      - "5000:8080"
+
+  coinupworker:
+    build:
+      context: .
+      dockerfile: CoinUpWorkerService/Dockerfile
+    depends_on:
+      - sqlserver
+
+  angular:
+    build:
+      context: /mnt/c/Users/Etudiant/Desktop/PROJETS/CoinUpFront
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+
+volumes:
+  sqlserverdata:
