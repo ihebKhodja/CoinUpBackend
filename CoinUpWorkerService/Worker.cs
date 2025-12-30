@@ -16,7 +16,7 @@ namespace CoinUpWorkerService
         {
             _logger.LogInformation("Worker démarré à {Time}", DateTimeOffset.Now);
 
-            var interval = TimeSpan.FromMinutes(3); // Configure interval here
+            var interval = TimeSpan.FromDays(1); // Run once a day
 
             try
             {
@@ -24,8 +24,8 @@ namespace CoinUpWorkerService
                 var scheduler = scope.ServiceProvider.GetRequiredService<JobScheduler>();
 
                 // Call the scheduler once; it handles the periodic execution internally
-                //await scheduler.ScheduleDataCollectionJob(interval, stoppingToken);
-                await scheduler.ScheduleDataCollectionJobOnce();
+                await scheduler.ScheduleDataCollectionJob(interval, stoppingToken);
+                // await scheduler.ScheduleDataCollectionJobOnce();
             }
             catch (Exception ex)
             {

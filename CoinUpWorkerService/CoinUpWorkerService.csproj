@@ -4,6 +4,7 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<UseAppHost>false</UseAppHost> <!-- Ensure this line is present to avoid MSB3027/MSB3021 errors -->
 		<UserSecretsId>dotnet-CoinUpWorkerService-e0605a47-78cd-48de-b82f-3560857a5423</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	</PropertyGroup>
@@ -26,6 +27,12 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\CoinUp.Shared\CoinUp.Shared.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="CoinUpWorkerService.Tests\**\*.cs" />
+	  <EmbeddedResource Remove="CoinUpWorkerService.Tests\**\*" />
+	  <None Remove="CoinUpWorkerService.Tests\**\*" />
 	</ItemGroup>
 
 	<ItemGroup>

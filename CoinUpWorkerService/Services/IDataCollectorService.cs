@@ -6,6 +6,6 @@ namespace CoinUpWorkerService.Services
     {
         Task<List<CoinsMarket>> FetchCoinsMarketAsync();
         Task<List<CoinsMarketCategory>> FetchMarketCategoriesAsync();
-        Task<MarketChartDetails?> FetchMarketChartAsync(string id, int rank, int days);
+        Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days);
     }
 }

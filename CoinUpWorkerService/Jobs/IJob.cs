@@ -9,7 +9,8 @@ namespace CoinUpWorkerService.Jobs
     public interface IJob
     {
         Task ExecuteGetMarketAsync();
-        Task ExecuteGetHistoryAsync();
+        Task ExecuteGetHistoryAsync(int days);
+        Task ExecuteGetHistoryAllAsync();
 
     }
 }

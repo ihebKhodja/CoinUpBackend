@@ -1,6 +1,6 @@
 ﻿using CoinUp.Shared.Models;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
+using System.Net;
 using System.Text.Json;
 
 namespace CoinUpWorkerService.Services
@@ -8,7 +8,6 @@ namespace CoinUpWorkerService.Services
     public class CoinCapService : IDataCollectorService
     {
         private readonly HttpClient _httpClient;
-        private readonly string _apiKey;
         private readonly ILogger<CoinCapService> _logger;
 
         public CoinCapService(HttpClient httpClient, IConfiguration configuration, ILogger<CoinCapService> logger)
@@ -16,26 +15,87 @@ namespace CoinUpWorkerService.Services
             _httpClient = httpClient;
             _logger = logger;
 
-            _apiKey = configuration["CoinGecko:ApiKey"]
-                ?? throw new InvalidOperationException("API Key manquante dans appsettings.json");
-
             var baseUrl = configuration["CoinGecko:BaseUrl"]
-                ?? throw new InvalidOperationException("Base Url manquante dans appsettings.json");
+                ?? throw new InvalidOperationException("Base Url manquante dans appsettings.json (CoinGecko:BaseUrl)");
+
+            // Ensure trailing slash so relative URLs behave predictably.
+            if (!baseUrl.EndsWith('/'))
+            {
+                baseUrl += "/";
+            }
 
             _httpClient.BaseAddress = new Uri(baseUrl);
 
-            // REQUIRED: CoinGecko blocks requests without User-Agent
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CoinUpWorker/1.0");
+            // CoinGecko may reject requests without a User-Agent.
+            if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+            {
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("CoinUpWorker/1.0");
+            }
 
-            //_httpClient.DefaultRequestHeaders.Add("X-CG-API-KEY", _apiKey);
-            _httpClient.DefaultRequestHeaders.Add("x-cg-demo-api-key", _apiKey);
+            // API key is optional (some CoinGecko endpoints work without it, but are rate-limited).
+            // If you have a Pro key, you typically need:
+            // - CoinGecko:BaseUrl = https://pro-api.coingecko.com/api/v3/
+            // - CoinGecko:ApiKeyHeader = x-cg-pro-api-key
+            var apiKey = configuration["CoinGecko:ApiKey"]; // can come from env vars / user-secrets too
+            var apiKeyHeader = configuration["CoinGecko:ApiKeyHeader"];
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                // If the header isn't explicitly configured, infer it from the base URL.
+                // CoinGecko will return 400 if you send a Pro key to the public URL.
+                apiKeyHeader = string.IsNullOrWhiteSpace(apiKeyHeader)
+                    ? (baseUrl.Contains("pro-api.coingecko.com", StringComparison.OrdinalIgnoreCase)
+                        ? "x-cg-pro-api-key"
+                        : "x-cg-demo-api-key")
+                    : apiKeyHeader;
+
+                if (!_httpClient.DefaultRequestHeaders.Contains(apiKeyHeader))
+                {
+                    _httpClient.DefaultRequestHeaders.Add(apiKeyHeader, apiKey);
+                }
+            }
+        }
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private async Task<T> GetFromJsonWithErrorsAsync<T>(string relativeUrl, CancellationToken cancellationToken = default)
+        {
+            using var response = await _httpClient.GetAsync(relativeUrl, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                var value = JsonSerializer.Deserialize<T>(json, JsonOptions);
+                if (value is null)
+                {
+                    throw new InvalidOperationException($"Empty/invalid JSON from CoinGecko for '{relativeUrl}'.");
+                }
+                return value;
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogError(
+                "CoinGecko request failed: {StatusCode} {ReasonPhrase}. Url: {Url}. Body: {Body}",
+                (int)response.StatusCode,
+                response.ReasonPhrase,
+                new Uri(_httpClient.BaseAddress!, relativeUrl).ToString(),
+                body
+            );
+
+            throw new HttpRequestException(
+                $"CoinGecko request failed with {(int)response.StatusCode} ({response.StatusCode}).",
+                inner: null,
+                statusCode: response.StatusCode
+            );
         }
 
 
         public async Task<List<CoinsMarket>> FetchCoinsMarketAsync()
         {
-
-            var items = await _httpClient.GetFromJsonAsync<List<JsonElement>>(
+            var items = await GetFromJsonWithErrorsAsync<List<JsonElement>>(
                 "coins/markets?vs_currency=usd&per_page=100"
             );
 
@@ -95,7 +155,7 @@ namespace CoinUpWorkerService.Services
 
         public async Task<List<CoinsMarketCategory>> FetchMarketCategoriesAsync()
         {
-            var items = await _httpClient.GetFromJsonAsync<List<JsonElement>>("coins/categories");
+            var items = await GetFromJsonWithErrorsAsync<List<JsonElement>>("coins/categories");
 
             var result = new List<CoinsMarketCategory>();
 
@@ -135,7 +195,7 @@ namespace CoinUpWorkerService.Services
             return result;
         }
 
-        public async Task<MarketChartDetails?> FetchMarketChartAsync(string id, int rank, int days)
+        public async Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Id is required", nameof(id));
@@ -145,12 +205,10 @@ namespace CoinUpWorkerService.Services
                 string endpoint =
                     $"coins/{id}/market_chart?vs_currency=usd&days={days}";
 
-                var json = await _httpClient.GetFromJsonAsync<JsonElement>(endpoint);
+                var json = await GetFromJsonWithErrorsAsync<JsonElement>(endpoint);
 
-                return new MarketChartDetails
+                return new MarketChartWindow
                 {
-                    Id = id,
-                    Rank = rank,
                     Prices = ConvertToDecimalList(json.GetProperty("prices")),
                     MarketCaps = ConvertToDecimalList(json.GetProperty("market_caps")),
                     TotalVolumes = ConvertToDecimalList(json.GetProperty("total_volumes"))
