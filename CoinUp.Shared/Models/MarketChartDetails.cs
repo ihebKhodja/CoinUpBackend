@@ -13,41 +13,34 @@ namespace CoinUp.Shared.Models
     public class MarketChartDetails
     {
         [Key]
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        // Coin id from CoinGecko (ex: "bitcoin").
+        // We keep this as the primary key so there is one DB row per coin.
+        public string Id { get; set; } = string.Empty;
         public int Rank { get; set; }
 
-        // JSON columns stored in database
-        public string PricesJson { get; set; } = "[]";
-        public string MarketCapsJson { get; set; } = "[]";
-        public string TotalVolumesJson { get; set; } = "[]";
+        // JSON stored in DB. Contains multiple time windows keyed by days (1/7/30/90/365).
+        // Example:
+        // { "1": {"prices": [[...]], ... }, "7": { ... }, "365": { ... } }
+        public string ChartsJson { get; set; } = "{}";
 
-        // Runtime properties (NOT mapped)
+        // Runtime helper (NOT mapped): read/write the JSON as a dictionary.
+        // IMPORTANT: if you mutate the returned dictionary, re-assign it back to persist to ChartsJson.
         [NotMapped]
-        public List<List<decimal>> Prices
+        public Dictionary<int, MarketChartWindow> Charts
         {
-            get => string.IsNullOrEmpty(PricesJson)
+            get => string.IsNullOrWhiteSpace(ChartsJson)
                 ? new()
-                : JsonSerializer.Deserialize<List<List<decimal>>>(PricesJson) ?? new();
-            set => PricesJson = JsonSerializer.Serialize(value);
+                : JsonSerializer.Deserialize<Dictionary<int, MarketChartWindow>>(ChartsJson) ?? new();
+            set => ChartsJson = JsonSerializer.Serialize(value);
         }
 
-        [NotMapped]
-        public List<List<decimal>> MarketCaps
-        {
-            get => string.IsNullOrEmpty(MarketCapsJson)
-                ? new()
-                : JsonSerializer.Deserialize<List<List<decimal>>>(MarketCapsJson) ?? new();
-            set => MarketCapsJson = JsonSerializer.Serialize(value);
-        }
-        [NotMapped]
-        public List<List<decimal>> TotalVolumes
-        {
-            get => string.IsNullOrEmpty(TotalVolumesJson)
-                ? new()
-                : JsonSerializer.Deserialize<List<List<decimal>>>(TotalVolumesJson) ?? new();
-            set => TotalVolumesJson = JsonSerializer.Serialize(value);
-        }
+    }
 
+    public class MarketChartWindow
+    {
+        public List<List<decimal>> Prices { get; set; } = new();
+        public List<List<decimal>> MarketCaps { get; set; } = new();
+        public List<List<decimal>> TotalVolumes { get; set; } = new();
     }
 
 }
