@@ -86,7 +86,8 @@ namespace CoinUpAPI.Services
             {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username)
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+            new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? "User" : user.Role)
         };
 
             var token = new JwtSecurityToken(

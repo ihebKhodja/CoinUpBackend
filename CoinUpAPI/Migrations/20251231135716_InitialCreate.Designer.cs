@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoinUpAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251230220113_MarketChartDetails_MultiRangeCharts")]
-    partial class MarketChartDetails_MultiRangeCharts
+    [Migration("20251231135716_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
