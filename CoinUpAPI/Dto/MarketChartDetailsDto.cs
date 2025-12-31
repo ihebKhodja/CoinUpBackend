@@ -6,6 +6,8 @@
 
         public int Rank { get; set; }
 
+        public int Days { get; set; }
+
         public List<List<decimal>> Prices { get; set; } = new();
 
         public List<List<decimal>> MarketCaps { get; set; } = new();

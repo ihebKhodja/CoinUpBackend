@@ -115,6 +115,29 @@ namespace CoinUpAPI.Services
 
             return coin.Current_Price;
         }
+
+        public async Task<MarketChartDetailsDto?> GetMarketChartAsync(string coinId, int days)
+        {
+            var entity = await _dbContext.MarketChartDetails
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == coinId);
+
+            if (entity == null)
+                return null;
+
+            if (!entity.Charts.TryGetValue(days, out var window))
+                return null;
+
+            return new MarketChartDetailsDto
+            {
+                Id = entity.Id,
+                Rank = entity.Rank,
+                Days = days,
+                Prices = window.Prices,
+                MarketCaps = window.MarketCaps,
+                TotalVolumes = window.TotalVolumes
+            };
+        }
     }
 
 }

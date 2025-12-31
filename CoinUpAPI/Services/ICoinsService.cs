@@ -8,5 +8,7 @@ namespace CoinUpAPI.Services
         Task<CoinsMarketDto?> GetByIdAsync(string id);
         Task<decimal> GetCurrentPriceAsync(string coinId);
 
+        Task<MarketChartDetailsDto?> GetMarketChartAsync(string coinId, int days);
+
     }
 }
