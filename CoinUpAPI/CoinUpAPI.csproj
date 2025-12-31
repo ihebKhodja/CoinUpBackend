@@ -29,4 +29,10 @@
     <ProjectReference Include="..\CoinUp.Shared\CoinUp.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="CoinUpAPI.Tests\**\*.cs" />
+    <EmbeddedResource Remove="CoinUpAPI.Tests\**\*" />
+    <None Remove="CoinUpAPI.Tests\**\*" />
+  </ItemGroup>
+
 </Project>

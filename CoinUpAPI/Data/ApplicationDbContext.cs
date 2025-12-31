@@ -20,10 +20,18 @@ namespace CoinUpAPI.Data
         public DbSet<WatchlistItem> WatchlistItems { get; set; }
         public DbSet<PortfolioSnapshot> PortfolioSnapshots { get; set; }
 
+        public DbSet<PriceAlert> PriceAlerts { get; set; }
+        public DbSet<AlertNotification> AlertNotifications { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Role)
+                .HasMaxLength(16)
+                .HasDefaultValue("User");
 
             // Wallets
             modelBuilder.Entity<EWallet>()
@@ -56,6 +64,41 @@ namespace CoinUpAPI.Data
             modelBuilder.Entity<CoinsMarket>()
                 .Property(c => c.Total_Volume)
                 .HasColumnType("decimal(18,2)");
+
+            // Alerts
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.ThresholdPrice)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.ThresholdPercent)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.AbovePrice)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BelowPrice)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.AbovePercentFromBuy)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BelowPercentFromBuy)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BalanceBelow)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .HasIndex(a => new { a.UserId, a.IsActive });
+
+            modelBuilder.Entity<PriceAlert>()
+                .HasIndex(a => new { a.CoinId, a.IsActive });
         }
 
     }

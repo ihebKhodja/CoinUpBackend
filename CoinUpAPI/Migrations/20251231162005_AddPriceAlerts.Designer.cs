@@ -4,6 +4,7 @@ using CoinUpAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoinUpAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251231162005_AddPriceAlerts")]
+    partial class AddPriceAlerts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -274,22 +277,8 @@ namespace CoinUpAPI.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<decimal?>("AbovePercentFromBuy")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal?>("AbovePrice")
-                        .HasColumnType("decimal(18,8)");
-
-                    b.Property<decimal?>("BalanceBelow")
-                        .HasColumnType("decimal(18,8)");
-
-                    b.Property<decimal?>("BelowPercentFromBuy")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal?>("BelowPrice")
-                        .HasColumnType("decimal(18,8)");
-
                     b.Property<string>("CoinId")
+                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("CooldownMinutes")

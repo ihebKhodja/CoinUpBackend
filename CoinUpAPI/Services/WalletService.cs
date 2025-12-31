@@ -1,6 +1,7 @@
 ﻿using CoinUpAPI.Data;
 using CoinUpAPI.Dto;
 using CoinUpAPI.Models;
+using CoinUpAPI.Services.Email;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinUpAPI.Services
@@ -9,11 +10,15 @@ namespace CoinUpAPI.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ICoinsService _market;
+        private readonly IEmailSender _email;
+        private readonly ILogger<WalletService> _logger;
 
-        public WalletService(ApplicationDbContext context, ICoinsService market)
+        public WalletService(ApplicationDbContext context, ICoinsService market, IEmailSender email, ILogger<WalletService> logger)
         {
             _context = context;
             _market = market;
+            _email = email;
+            _logger = logger;
         }
 
         public async Task<EWalletDto> GetWalletAsync(string userId)
@@ -139,6 +144,13 @@ namespace CoinUpAPI.Services
             // 5️⃣ Save all changes
             await _context.SaveChangesAsync();
 
+            await TrySendWalletEmailAsync(
+                userId,
+                subject: "[CoinUp] Achat effectué",
+                body: $"Achat confirmé.\n\nCoin: {dto.CoinId}\nQuantité: {dto.Quantity}\nPrix unitaire: {price}\nCoût: {cost}\nNouveau solde: {wallet.Balance}\n");
+
+            await CheckAndTriggerLowBalanceAlertsAsync(userId, wallet.Balance);
+
             // 6️⃣ Return response
             return new BuySellResponseDto
             {
@@ -184,6 +196,13 @@ namespace CoinUpAPI.Services
 
             await _context.SaveChangesAsync();
 
+            await TrySendWalletEmailAsync(
+                userId,
+                subject: "[CoinUp] Vente effectuée",
+                body: $"Vente confirmée.\n\nCoin: {dto.CoinId}\nQuantité: {dto.Quantity}\nPrix unitaire: {price}\nRevenu: {revenue}\nNouveau solde: {wallet.Balance}\n");
+
+            await CheckAndTriggerLowBalanceAlertsAsync(userId, wallet.Balance);
+
             return new BuySellResponseDto
             {
                 CoinId = dto.CoinId,
@@ -226,10 +245,111 @@ namespace CoinUpAPI.Services
             var wallet = await _context.EWallets
                            .Include(w => w.Holdings)
                            .FirstOrDefaultAsync(w => w.UserId == userId);
+
+            if (wallet == null)
+            {
+                wallet = new EWallet
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    UserId = userId,
+                    Balance = 0,
+                    Holdings = new List<CoinHolding>()
+                };
+                await _context.EWallets.AddAsync(wallet);
+            }
+
             wallet.Balance += amount;
 
             await _context.SaveChangesAsync();
+
+            await CheckAndTriggerLowBalanceAlertsAsync(userId, wallet.Balance);
+
             return true;
+        }
+
+        private async Task CheckAndTriggerLowBalanceAlertsAsync(string userId, decimal currentBalance)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+
+                var alerts = await _context.PriceAlerts
+                    .Where(a => a.UserId == userId && a.IsActive && a.Type == AlertType.WalletBalanceBelow && a.BalanceBelow.HasValue)
+                    .ToListAsync();
+
+                if (alerts.Count == 0)
+                    return;
+
+                foreach (var alert in alerts)
+                {
+                    var threshold = alert.BalanceBelow!.Value;
+                    if (currentBalance > threshold)
+                        continue;
+
+                    if (alert.LastTriggeredAt.HasValue)
+                    {
+                        var cooldown = TimeSpan.FromMinutes(alert.CooldownMinutes <= 0 ? 60 : alert.CooldownMinutes);
+                        if ((now - alert.LastTriggeredAt.Value) < cooldown)
+                            continue;
+                    }
+
+                    var user = await _context.Users
+                        .AsNoTracking()
+                        .Where(u => u.Id == userId)
+                        .Select(u => new { u.Email })
+                        .FirstOrDefaultAsync();
+
+                    if (user == null || string.IsNullOrWhiteSpace(user.Email))
+                        continue;
+
+                    var subject = "[CoinUp] Solde faible";
+                    var body = $"Votre solde est passé sous le seuil configuré.\n\n" +
+                               $"Solde actuel: {currentBalance}\n" +
+                               $"Seuil: {threshold}\n";
+
+                    await _email.SendAsync(user.Email, subject, body);
+
+                    alert.LastTriggeredAt = now;
+                    _context.AlertNotifications.Add(new AlertNotification
+                    {
+                        AlertId = alert.Id,
+                        UserId = userId,
+                        Channel = "Email",
+                        Success = true,
+                        SentAt = now
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to trigger low-balance alerts.");
+            }
+        }
+
+        private async Task TrySendWalletEmailAsync(string userId, string subject, string body)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { u.Email })
+                    .FirstOrDefaultAsync();
+
+                if (user == null || string.IsNullOrWhiteSpace(user.Email))
+                {
+                    return;
+                }
+
+                await _email.SendAsync(user.Email, subject, body);
+            }
+            catch (Exception ex)
+            {
+                // Do not fail wallet operations if email fails
+                _logger.LogWarning(ex, "Failed to send wallet notification email.");
+            }
         }
     }
 

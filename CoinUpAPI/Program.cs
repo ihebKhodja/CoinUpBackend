@@ -1,12 +1,21 @@
 ﻿using CoinUpAPI.Data;
+using CoinUpAPI.Config;
 using CoinUpAPI.Models;
+using CoinUpAPI.Middleware;
 using CoinUpAPI.Services;
+using CoinUpAPI.Services.Alerts;
+using CoinUpAPI.Services.Email;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+
+
+// Load .env before configuration is built
+DotEnv.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
+DotEnv.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,6 +41,11 @@ builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<ICoinsService, CoinsService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IWatchlistService, WatchlistService>();
+builder.Services.AddScoped<IAlertsService, AlertsService>();
+
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddHostedService<AlertEvaluationHostedService>();
 
 // JWT authentication
 builder.Services.AddAuthentication(options =>
@@ -102,6 +116,34 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+var runMigrations = string.Equals(
+    builder.Configuration["RUN_MIGRATIONS"],
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+
+if (runMigrations)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    const int maxAttempts = 30;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            await db.Database.MigrateAsync();
+            break;
+        }
+        catch when (attempt < maxAttempts)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+    }
+}
+
+// Seed admin user (dev-friendly defaults)
+await app.SeedAdminAsync();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -118,10 +160,21 @@ if (app.Environment.IsDevelopment())
     app.UseCors("Frontend");
 }
 
-app.UseHttpsRedirection();
+var runningInContainer = string.Equals(
+    Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+
+if (!runningInContainer)
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
+app.UseMiddleware<AdminOnlyMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 
 //app.Urls.Add("http://0.0.0.0:8080");
 app.Run();
+
+public partial class Program { }
