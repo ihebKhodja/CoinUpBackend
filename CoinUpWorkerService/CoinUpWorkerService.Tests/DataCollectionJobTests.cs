@@ -24,6 +24,7 @@ public class DataCollectionJobTests
         {
             o.RateLimitMs = 0;
             o.ThrowOnError = true;
+            o.HistoryWindowRetryDelayMs = 0;
         });
         services.AddScoped<DataCollectionJob>();
 
@@ -71,6 +72,7 @@ public class DataCollectionJobTests
         {
             o.RateLimitMs = 0;
             o.ThrowOnError = true;
+            o.HistoryWindowRetryDelayMs = 0;
         });
         services.AddScoped<DataCollectionJob>();
 
@@ -101,6 +103,45 @@ public class DataCollectionJobTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteGetHistoryAllAsync_StopsAfterMaxAttempts_WhenFailuresPersist()
+    {
+        var databaseRoot = new InMemoryDatabaseRoot();
+        var databaseName = $"{nameof(ExecuteGetHistoryAllAsync_StopsAfterMaxAttempts_WhenFailuresPersist)}-{Guid.NewGuid()}";
+
+        var failingCollector = new AlwaysNullChartCollector();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName, databaseRoot));
+        services.AddScoped<IDataCollectorService>(_ => failingCollector);
+        services.AddOptions<DataCollectionJobOptions>().Configure(o =>
+        {
+            o.RateLimitMs = 0;
+            o.ThrowOnError = false;
+            o.HistoryWindowRetryDelayMs = 0;
+            o.HistoryWindowMaxRetryMinutes = 30;
+            o.HistoryWindowMaxRetryAttempts = 2;
+        });
+        services.AddScoped<DataCollectionJob>();
+
+        await using var provider = services.BuildServiceProvider();
+
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            db.CoinsMarket.Add(new CoinsMarket { Id = "bitcoin", Name = "Bitcoin", Symbol = "btc", Rank = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        var job = provider.GetRequiredService<DataCollectionJob>();
+        await job.ExecuteGetHistoryAllAsync();
+
+        Assert.True(failingCollector.Calls >= 2);
+    }
+
     private sealed class FakeCollectorService : IDataCollectorService
     {
         public Task<List<CoinsMarket>> FetchCoinsMarketAsync()
@@ -127,6 +168,24 @@ public class DataCollectionJobTests
                 MarketCaps = new() { new() { 1m, 1000m } },
                 TotalVolumes = new() { new() { 1m, 10m } }
             });
+        }
+    }
+
+    private sealed class AlwaysNullChartCollector : IDataCollectorService
+    {
+        private int _calls;
+        public int Calls => _calls;
+
+        public Task<List<CoinsMarket>> FetchCoinsMarketAsync()
+            => Task.FromResult(new List<CoinsMarket>());
+
+        public Task<List<CoinsMarketCategory>> FetchMarketCategoriesAsync()
+            => Task.FromResult(new List<CoinsMarketCategory>());
+
+        public Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult<MarketChartWindow?>(null);
         }
     }
 }

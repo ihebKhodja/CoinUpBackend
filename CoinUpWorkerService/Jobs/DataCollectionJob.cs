@@ -82,6 +82,19 @@ namespace CoinUpWorkerService.Jobs
         {
             _logger.LogInformation("Job de collecte (history {Days}d) démarré à {Time}", days, DateTimeOffset.Now);
 
+            var ok = await ExecuteGetHistoryInternalAsync(days);
+            if (!ok)
+            {
+                _logger.LogWarning("❌ History job did not fully succeed for {Days}d", days);
+                if (_options.ThrowOnError)
+                {
+                    throw new InvalidOperationException($"History job failed for {days}d");
+                }
+            }
+        }
+
+        private async Task<bool> ExecuteGetHistoryInternalAsync(int days)
+        {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
@@ -89,19 +102,12 @@ namespace CoinUpWorkerService.Jobs
                 var collector = scope.ServiceProvider.GetRequiredService<IDataCollectorService>();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-
-                // -----------------------------
-                // 1. Fetch external data
-                // -----------------------------
                 var coinsMarkets = await dbContext.CoinsMarket.OrderBy(x => x.Rank).ToListAsync();
 
-
-
-                // -----------------------------
-                // 4. Fetch Market Chart For Each Coin
-                // -----------------------------
                 _logger.LogInformation("Fetching market chart ({Days}d) for {Count} coins...", days, coinsMarkets.Count);
                 var rateLimitMs = _options.RateLimitMs;
+
+                var dayFailed = false;
 
                 foreach (var coin in coinsMarkets)
                 {
@@ -123,8 +129,8 @@ namespace CoinUpWorkerService.Jobs
 
                     var charts = entity.Charts;
 
-                    bool success = false;
-                    while (!success)
+                    var coinSuccess = false;
+                    while (!coinSuccess)
                     {
                         try
                         {
@@ -141,7 +147,7 @@ namespace CoinUpWorkerService.Jobs
                             await dbContext.SaveChangesAsync();
 
                             _logger.LogInformation("Chart fetched for {Id} ({Days}d)", coin.Id, days);
-                            success = true;
+                            coinSuccess = true;
                         }
                         catch (HttpRequestException ex) when ((int?)ex.StatusCode == 429)
                         {
@@ -163,25 +169,23 @@ namespace CoinUpWorkerService.Jobs
                         }
                     }
 
-                    // Delay before next coin to respect rate limits
+                    if (!coinSuccess)
+                    {
+                        dayFailed = true;
+                    }
+
                     if (rateLimitMs > 0)
                     {
                         await Task.Delay(rateLimitMs);
                     }
                 }
 
-
-
-                // If you have a MarketCharts table
-                _logger.LogInformation("🟢 Job terminé avec succès !");
+                return !dayFailed;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "🔴 Erreur dans le job de collecte");
-                if (_options.ThrowOnError)
-                {
-                    throw;
-                }
+                return false;
             }
         }
 
@@ -190,7 +194,60 @@ namespace CoinUpWorkerService.Jobs
             var daysOptions = new[] { 1, 7, 30, 90, 365 };
             foreach (var days in daysOptions)
             {
-                await ExecuteGetHistoryAsync(days);
+                var attempt = 0;
+                var startedAt = DateTimeOffset.UtcNow;
+                var maxRetryMinutes = _options.HistoryWindowMaxRetryMinutes <= 0 ? 30 : _options.HistoryWindowMaxRetryMinutes;
+                var maxAttempts = _options.HistoryWindowMaxRetryAttempts < 0 ? 0 : _options.HistoryWindowMaxRetryAttempts;
+                while (true)
+                {
+                    attempt++;
+                    var ok = await ExecuteGetHistoryInternalAsync(days);
+                    if (ok)
+                    {
+                        break;
+                    }
+
+                    var elapsed = DateTimeOffset.UtcNow - startedAt;
+                    if (elapsed >= TimeSpan.FromMinutes(maxRetryMinutes))
+                    {
+                        _logger.LogError(
+                            "❌ History window {Days}d still failing after {ElapsedMinutes:N1} minutes ({Attempt} attempts). Stopping history job.",
+                            days,
+                            elapsed.TotalMinutes,
+                            attempt);
+
+                        if (_options.ThrowOnError)
+                        {
+                            throw new InvalidOperationException(
+                                $"History window {days}d failed for more than {maxRetryMinutes} minutes");
+                        }
+
+                        return;
+                    }
+
+                    if (maxAttempts > 0 && attempt >= maxAttempts)
+                    {
+                        _logger.LogError(
+                            "❌ History window {Days}d still failing after {Attempt} attempts. Stopping history job.",
+                            days,
+                            attempt);
+
+                        if (_options.ThrowOnError)
+                        {
+                            throw new InvalidOperationException($"History window {days}d failed after {attempt} attempts");
+                        }
+
+                        return;
+                    }
+
+                    _logger.LogWarning(
+                        "❌ History window {Days}d failed (attempt {Attempt}). Retrying until success...",
+                        days,
+                        attempt);
+
+                    var retryDelayMs = Math.Max(0, Math.Max(_options.HistoryWindowRetryDelayMs, _options.RateLimitMs));
+                    await Task.Delay(retryDelayMs);
+                }
             }
         }
 
