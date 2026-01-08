@@ -47,11 +47,11 @@ namespace CoinUpAPI.Controllers
         // GET: api/coins/{id}/market-chart?days=7
         [HttpGet("{id}/market-chart")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MarketChartDetailsDto))]
-        public async Task<IActionResult> GetMarketChartById(string id, [FromQuery] MarketChartDays days = MarketChartDays.D365)
+        public async Task<IActionResult> GetMarketChartById(string id, [FromQuery] MarketChartDays days = MarketChartDays.D7)
         {
             if (!Enum.IsDefined(typeof(MarketChartDays), days))
             {
-                return BadRequest(new { Message = $"Invalid days value '{(int)days}'. Allowed: 1, 7, 30, 90, 365." });
+                return BadRequest(new { Message = $"Invalid days value '{(int)days}'. Allowed: 1, 7." });
             }
 
             var chart = await _coinsService.GetMarketChartAsync(id, (int)days);
