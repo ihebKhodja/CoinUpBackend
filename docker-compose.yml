@@ -14,6 +14,21 @@ services:
       timeout: 5s
       retries: 20
 
+  sql-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    command:
+      [
+        "bash",
+        "-lc",
+        "/opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$MSSQL_SA_PASSWORD\" -Q \"IF DB_ID('CoinDB') IS NULL CREATE DATABASE [CoinDB];\""
+      ]
+    restart: "no"
+
   coinupapi:
     build:
       context: .
@@ -23,8 +38,14 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Server=sqlserver,1433;Database=CoinDB;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False
       RUN_MIGRATIONS: "true"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "</dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - sqlserver
+      sql-init:
+        condition: service_completed_successfully
     ports:
       - "5000:8080"
 
@@ -35,7 +56,8 @@ services:
     environment:
       ConnectionStrings__DefaultConnection: Server=sqlserver,1433;Database=CoinDB;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False
     depends_on:
-      - sqlserver
+      coinupapi:
+        condition: service_healthy
 
   coinupfront:
     build:
