@@ -191,7 +191,20 @@ namespace CoinUpWorkerService.Jobs
 
         public async Task ExecuteGetHistoryAllAsync()
         {
-            var daysOptions = new[] { 1, 7, 30, 90, 365 };
+            var daysOptions = (_options.HistoryDaysOptions?.Length > 0
+                    ? _options.HistoryDaysOptions
+                    : new[] { 1, 7 })
+                .Where(d => d > 0)
+                .Distinct()
+                .OrderBy(d => d)
+                .ToArray();
+
+            if (daysOptions.Length == 0)
+            {
+                _logger.LogWarning("No HistoryDaysOptions configured; skipping history collection.");
+                return;
+            }
+
             foreach (var days in daysOptions)
             {
                 var attempt = 0;
