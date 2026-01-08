@@ -13,7 +13,9 @@ namespace CoinUpWorkerService.Services
         private readonly ILogger<CoinCapService> _logger;
 
         private readonly string? _apiKey;
+        private readonly string _apiKeyHeader;
         private const string DemoApiKeyHeader = "x_cg_demo_api_key";
+        private const string ProApiKeyHeader = "x-cg-pro-api-key";
         private const string DefaultDemoApiKey = "CG-gLneL1GMruEEaWknWz6LtGi9";
 
         public CoinCapService(HttpClient httpClient, IConfiguration configuration, ILogger<CoinCapService> logger)
@@ -42,27 +44,40 @@ namespace CoinUpWorkerService.Services
             // If you have a Pro key, you typically need:
             // - CoinGecko:BaseUrl = https://pro-api.coingecko.com/api/v3/
             // - CoinGecko:ApiKeyHeader = x-cg-pro-api-key
+            var configuredHeader = configuration["CoinGecko:ApiKeyHeader"];
+            _apiKeyHeader = !string.IsNullOrWhiteSpace(configuredHeader)
+                ? configuredHeader.Trim()
+                : (baseUrl.Contains("pro-api.coingecko.com", StringComparison.OrdinalIgnoreCase)
+                    ? ProApiKeyHeader
+                    : DemoApiKeyHeader);
+
             var apiKey = configuration["CoinGecko:ApiKey"]; // can come from env vars / user-secrets too
 
             // Normalize common copy/paste issues:
             // - extra whitespace/newlines
             // - key accidentally pasted twice concatenated (A + A)
-            apiKey = NormalizeApiKey(apiKey) ?? DefaultDemoApiKey;
+            apiKey = NormalizeApiKey(apiKey);
+
+            // For public CoinGecko v3 usage, keep a demo key fallback.
+            // For Pro, never inject a demo key.
+            if (string.IsNullOrWhiteSpace(apiKey) && string.Equals(_apiKeyHeader, DemoApiKeyHeader, StringComparison.Ordinal))
+            {
+                apiKey = DefaultDemoApiKey;
+            }
 
             _apiKey = apiKey;
 
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
-                // CoinUp uses CoinGecko demo keys on the public v3 API.
-                // Attach the demo header; we'll also re-attach per request.
-                if (_httpClient.DefaultRequestHeaders.Contains(DemoApiKeyHeader))
+                // Attach the configured header; we'll also re-attach per request.
+                if (_httpClient.DefaultRequestHeaders.Contains(_apiKeyHeader))
                 {
-                    _httpClient.DefaultRequestHeaders.Remove(DemoApiKeyHeader);
+                    _httpClient.DefaultRequestHeaders.Remove(_apiKeyHeader);
                 }
 
-                _httpClient.DefaultRequestHeaders.Add(DemoApiKeyHeader, apiKey);
+                _httpClient.DefaultRequestHeaders.Add(_apiKeyHeader, apiKey);
 
-                _logger.LogInformation("CoinGecko demo API key header configured: {Header}", DemoApiKeyHeader);
+                _logger.LogInformation("CoinGecko API key header configured: {Header}", _apiKeyHeader);
             }
             else
             {
@@ -114,19 +129,19 @@ namespace CoinUpWorkerService.Services
         private async Task<T> GetFromJsonWithErrorsAsync<T>(string relativeUrl, CancellationToken cancellationToken = default)
         {
             var absoluteUrl = new Uri(_httpClient.BaseAddress!, relativeUrl).ToString();
-            var hasDemoHeader = _httpClient.DefaultRequestHeaders.Contains(DemoApiKeyHeader);
+            var hasApiKeyHeader = _httpClient.DefaultRequestHeaders.Contains(_apiKeyHeader);
 
             _logger.LogInformation(
-                "CoinGecko request: {Url} (demoHeaderPresent={DemoPresent})",
+                "CoinGecko request: {Url} (apiKeyHeaderPresent={ApiKeyPresent})",
                 absoluteUrl,
-                hasDemoHeader
+                hasApiKeyHeader
             );
 
             using var request = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
             if (!string.IsNullOrWhiteSpace(_apiKey))
             {
-                request.Headers.Remove(DemoApiKeyHeader);
-                request.Headers.Add(DemoApiKeyHeader, _apiKey);
+                request.Headers.Remove(_apiKeyHeader);
+                request.Headers.Add(_apiKeyHeader, _apiKey);
             }
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -261,16 +276,16 @@ namespace CoinUpWorkerService.Services
             return result;
         }
 
-        public async Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days)
+        public async Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days = 90)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Id is required", nameof(id));
 
             try
             {
-                days = 90;
+                days = days <= 0 ? 90 : days;
                 string endpoint =
-                    $"coins/{id}/market_chart?vs_currency=usd&days={days}";
+                    $"coins/{id}/market_chart?vs_currency=usd&days={90}";
 
                 var json = await GetFromJsonWithErrorsAsync<JsonElement>(endpoint);
 

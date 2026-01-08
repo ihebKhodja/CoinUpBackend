@@ -193,7 +193,7 @@ namespace CoinUpWorkerService.Jobs
         {
             var daysOptions = (_options.HistoryDaysOptions?.Length > 0
                     ? _options.HistoryDaysOptions
-                    : new[] { 1, 7 })
+                    : new[] { 90 })
                 .Where(d => d > 0)
                 .Distinct()
                 .OrderBy(d => d)

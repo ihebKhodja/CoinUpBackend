@@ -74,7 +74,7 @@ public class CoinsControllerIntegrationTests : IClassFixture<TestWebApplicationF
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Test");
 
-        var res = await client.GetAsync("/api/coins/eth/market-chart?days=7");
+        var res = await client.GetAsync("/api/coins/eth/market-chart");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 }

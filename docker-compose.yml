@@ -14,21 +14,6 @@ services:
       timeout: 5s
       retries: 20
 
-  sql-init:
-    image: mcr.microsoft.com/mssql-tools:latest
-    environment:
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-    depends_on:
-      sqlserver:
-        condition: service_healthy
-    command:
-      [
-        "bash",
-        "-lc",
-        "/opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$MSSQL_SA_PASSWORD\" -Q \"IF DB_ID('CoinDB') IS NULL CREATE DATABASE [CoinDB];\""
-      ]
-    restart: "no"
-
   coinupapi:
     build:
       context: .
@@ -44,8 +29,8 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
-      sql-init:
-        condition: service_completed_successfully
+      sqlserver:
+        condition: service_healthy
     ports:
       - "5000:8080"
 

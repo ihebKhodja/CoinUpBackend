@@ -161,7 +161,7 @@ public class DataCollectionJobTests
             });
         }
 
-        public Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days)
+        public Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days = 90)
         {
             return Task.FromResult<MarketChartWindow?>(new MarketChartWindow
             {
@@ -183,7 +183,7 @@ public class DataCollectionJobTests
         public Task<List<CoinsMarketCategory>> FetchMarketCategoriesAsync()
             => Task.FromResult(new List<CoinsMarketCategory>());
 
-        public Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days)
+        public Task<MarketChartWindow?> FetchMarketChartAsync(string id, int rank, int days = 90)
         {
             Interlocked.Increment(ref _calls);
             return Task.FromResult<MarketChartWindow?>(null);

@@ -23,7 +23,6 @@ namespace CoinUpAPI.Controllers
         // GET: api/coins
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginatedCoinsResponse))]
-        [HttpGet]
         public async Task<IActionResult> GetAllCoins([FromQuery] string? query, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             var result = await _coinsService.GetAllAsync(query, page, pageSize);
@@ -44,20 +43,17 @@ namespace CoinUpAPI.Controllers
         }
 
 
-        // GET: api/coins/{id}/market-chart?days=7
+        // GET: api/coins/{id}/market-chart
         [HttpGet("{id}/market-chart")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MarketChartDetailsDto))]
-        public async Task<IActionResult> GetMarketChartById(string id, [FromQuery] MarketChartDays days = MarketChartDays.D7)
+        public async Task<IActionResult> GetMarketChartById(string id)
         {
-            if (!Enum.IsDefined(typeof(MarketChartDays), days))
-            {
-                return BadRequest(new { Message = $"Invalid days value '{(int)days}'. Allowed: 1, 7." });
-            }
+            const int defaultDays = 90;
 
-            var chart = await _coinsService.GetMarketChartAsync(id, (int)days);
+            var chart = await _coinsService.GetMarketChartAsync(id, defaultDays);
             if (chart == null)
             {
-                return NotFound(new { Message = $"Market chart not found for coin '{id}' ({(int)days}d)." });
+                return NotFound(new { Message = $"Market chart not found for coin '{id}' ({defaultDays}d)." });
             }
 
             return Ok(chart);

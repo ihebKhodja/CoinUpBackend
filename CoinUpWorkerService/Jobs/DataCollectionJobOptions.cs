@@ -9,7 +9,7 @@ namespace CoinUpWorkerService.Jobs
         /// Which market chart windows (in days) to fetch in ExecuteGetHistoryAllAsync.
         /// Keep this small to reduce external API calls (e.g. [1,7,30] or [1,7,30,365]).
         /// </summary>
-        public int[] HistoryDaysOptions { get; set; } = new[] { 1, 7 };
+        public int[] HistoryDaysOptions { get; set; } = new[] {  90 };
 
         /// <summary>
         /// Maximum time to keep retrying a given history window (e.g. 1d, 7d) in ExecuteGetHistoryAllAsync.
