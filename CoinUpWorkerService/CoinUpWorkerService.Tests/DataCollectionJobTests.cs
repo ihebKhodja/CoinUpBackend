@@ -122,6 +122,7 @@ public class DataCollectionJobTests
             o.HistoryWindowRetryDelayMs = 0;
             o.HistoryWindowMaxRetryMinutes = 30;
             o.HistoryWindowMaxRetryAttempts = 2;
+            o.HistoryDaysOptions = new[] { 7 };
         });
         services.AddScoped<DataCollectionJob>();
 
