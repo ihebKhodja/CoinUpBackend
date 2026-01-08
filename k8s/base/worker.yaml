@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coinupworker
+  namespace: coinup
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coinupworker
+  template:
+    metadata:
+      labels:
+        app: coinupworker
+    spec:
+      initContainers:
+        - name: wait-for-sql
+          image: busybox:1.36
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -z sqlserver 1433; do echo waiting for sqlserver; sleep 2; done",
+            ]
+      containers:
+        - name: coinupworker
+          image: coinupworker:local
+          env:
+            - name: DOTNET_ENVIRONMENT
+              value: Development
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: coinup-secrets
+                  key: ConnectionStrings__DefaultConnection
