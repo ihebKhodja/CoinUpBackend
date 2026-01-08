@@ -33,6 +33,10 @@ namespace CoinUpAPI.Data
                 .HasMaxLength(16)
                 .HasDefaultValue("User");
 
+            modelBuilder.Entity<User>()
+                .Property(u => u.IsActive)
+                .HasDefaultValue(true);
+
             // Wallets
             modelBuilder.Entity<EWallet>()
                 .Property(w => w.Balance)

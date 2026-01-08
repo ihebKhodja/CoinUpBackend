@@ -38,6 +38,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
+builder.Services.AddScoped<IUsersService, UsersService>();
+
 builder.Services.AddScoped<ICoinsService, CoinsService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IWatchlistService, WatchlistService>();
@@ -116,27 +118,55 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-var runMigrations = string.Equals(
-    builder.Configuration["RUN_MIGRATIONS"],
-    "true",
-    StringComparison.OrdinalIgnoreCase);
+bool? runMigrationsSetting = builder.Configuration["RUN_MIGRATIONS"]?.Trim() switch
+{
+    "true" or "TRUE" or "True" => true,
+    "false" or "FALSE" or "False" => false,
+    _ => null
+};
+
+var runMigrations = runMigrationsSetting ?? builder.Environment.IsDevelopment();
 
 if (runMigrations)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    const int maxAttempts = 30;
-    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    if (!db.Database.IsRelational())
     {
-        try
+        app.Logger.LogInformation("Skipping database migrations because the configured EF provider is not relational.");
+    }
+    else
+    {
+
+        const int maxAttempts = 30;
+        Exception? lastMigrationError = null;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            await db.Database.MigrateAsync();
-            break;
+            try
+            {
+                await db.Database.MigrateAsync();
+                lastMigrationError = null;
+                break;
+            }
+            catch (Exception ex) when (attempt < maxAttempts)
+            {
+                lastMigrationError = ex;
+                app.Logger.LogWarning(ex, "Database migration attempt {Attempt}/{MaxAttempts} failed; retrying...", attempt, maxAttempts);
+                await Task.Delay(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                lastMigrationError = ex;
+                app.Logger.LogError(ex, "Database migration failed after {MaxAttempts} attempts.", maxAttempts);
+                throw;
+            }
         }
-        catch when (attempt < maxAttempts)
+
+        if (lastMigrationError is not null)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2));
+            app.Logger.LogError(lastMigrationError, "Database migration failed after {MaxAttempts} attempts.", maxAttempts);
+            throw lastMigrationError;
         }
     }
 }

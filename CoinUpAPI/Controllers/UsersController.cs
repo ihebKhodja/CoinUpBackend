@@ -1,8 +1,8 @@
-using CoinUpAPI.Data;
+using CoinUpAPI.Dto;
 using CoinUpAPI.Security;
+using CoinUpAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace CoinUpAPI.Controllers
 {
@@ -12,29 +12,32 @@ namespace CoinUpAPI.Controllers
     [AdminOnly]
     public class UsersController : ControllerBase
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IUsersService _usersService;
 
-        public UsersController(ApplicationDbContext db)
+        public UsersController(IUsersService usersService)
         {
-            _db = db;
+            _usersService = usersService;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetUsers()
         {
-            var users = await _db.Users
-                .AsNoTracking()
-                .Select(u => new
-                {
-                    u.Id,
-                    u.Username,
-                    u.Email,
-                    u.Role,
-                    u.CreatedAt
-                })
-                .ToListAsync();
-
+            var users = await _usersService.GetUsersAsync();
             return Ok(users);
+        }
+
+        [HttpPut("{userId}/is-active")]
+        public async Task<IActionResult> SetUserIsActive([FromRoute] string userId, [FromBody] SetUserActiveDto dto)
+        {
+            try
+            {
+                await _usersService.SetUserIsActiveAsync(userId, dto.IsActive);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
         }
     }
 }
