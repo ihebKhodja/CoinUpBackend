@@ -1,6 +1,8 @@
 ﻿using CoinUpWorkerService.Data;
 using CoinUpWorkerService.Services;
+using CoinUp.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,11 +15,17 @@ namespace CoinUpWorkerService.Jobs
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DataCollectionJob> _logger;
-        public DataCollectionJob(IServiceProvider serviceProvider, ILogger<DataCollectionJob> logger)
+        private readonly DataCollectionJobOptions _options;
+
+        public DataCollectionJob(
+            IServiceProvider serviceProvider,
+            ILogger<DataCollectionJob> logger,
+            IOptions<DataCollectionJobOptions> options)
 
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
+            _options = options.Value;
         }
 
         public async Task ExecuteGetMarketAsync()
@@ -42,8 +50,11 @@ namespace CoinUpWorkerService.Jobs
                 // -----------------------------
                 // 2. DELETE all existing DB rows 
                 // -----------------------------
-                dbContext.CoinsMarket.RemoveRange(dbContext.CoinsMarket);
-                dbContext.CoinsMarketCategory.RemoveRange(dbContext.CoinsMarketCategory);
+                var existingMarkets = await dbContext.CoinsMarket.ToListAsync();
+                var existingCategories = await dbContext.CoinsMarketCategory.ToListAsync();
+
+                dbContext.CoinsMarket.RemoveRange(existingMarkets);
+                dbContext.CoinsMarketCategory.RemoveRange(existingCategories);
 
                 await dbContext.SaveChangesAsync(); // Important to clear table before insert
 
@@ -60,13 +71,30 @@ namespace CoinUpWorkerService.Jobs
             catch (Exception ex)
             {
                 _logger.LogError(ex, "🔴 Erreur dans le job de collecte");
+                if (_options.ThrowOnError)
+                {
+                    throw;
+                }
             }
         }
 
-        public async Task ExecuteGetHistoryAsync()
+        public async Task ExecuteGetHistoryAsync(int days)
         {
-            _logger.LogInformation("Job de collecte démarré à {Time}", DateTimeOffset.Now);
+            _logger.LogInformation("Job de collecte (history {Days}d) démarré à {Time}", days, DateTimeOffset.Now);
 
+            var ok = await ExecuteGetHistoryInternalAsync(days);
+            if (!ok)
+            {
+                _logger.LogWarning("❌ History job did not fully succeed for {Days}d", days);
+                if (_options.ThrowOnError)
+                {
+                    throw new InvalidOperationException($"History job failed for {days}d");
+                }
+            }
+        }
+
+        private async Task<bool> ExecuteGetHistoryInternalAsync(int days)
+        {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
@@ -74,73 +102,165 @@ namespace CoinUpWorkerService.Jobs
                 var collector = scope.ServiceProvider.GetRequiredService<IDataCollectorService>();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-
-                // -----------------------------
-                // 1. Fetch external data
-                // -----------------------------
                 var coinsMarkets = await dbContext.CoinsMarket.OrderBy(x => x.Rank).ToListAsync();
 
-                dbContext.MarketChartDetails.RemoveRange(dbContext.MarketChartDetails);
+                _logger.LogInformation("Fetching market chart ({Days}d) for {Count} coins...", days, coinsMarkets.Count);
+                var rateLimitMs = _options.RateLimitMs;
 
-                await dbContext.SaveChangesAsync(); // Important to clear table before insert
-
-
-
-                // -----------------------------
-                // 4. Fetch Market Chart For Each Coin
-                // -----------------------------
-                _logger.LogInformation("Fetching market chart for {Count} coins...", coinsMarkets.Count);
-                var rateLimitMs = 10000;
+                var dayFailed = false;
 
                 foreach (var coin in coinsMarkets)
                 {
-                    bool success = false;
+                    var entity = await dbContext.MarketChartDetails.FindAsync(coin.Id);
+                    if (entity == null)
+                    {
+                        entity = new MarketChartDetails
+                        {
+                            Id = coin.Id,
+                            Rank = coin.Rank,
+                            ChartsJson = "{}"
+                        };
+                        dbContext.MarketChartDetails.Add(entity);
+                    }
+                    else
+                    {
+                        entity.Rank = coin.Rank;
+                    }
 
-                    while (!success)
+                    var charts = entity.Charts;
+
+                    var coinSuccess = false;
+                    while (!coinSuccess)
                     {
                         try
                         {
-                            var chart = await collector.FetchMarketChartAsync(coin.Id, coin.Rank);
-
-                            if (chart == null)
+                            var window = await collector.FetchMarketChartAsync(coin.Id, coin.Rank, days);
+                            if (window == null)
                             {
-                                _logger.LogWarning("Market chart is null for coin {Id}", coin.Id);
-                                break; // move to next coin
+                                _logger.LogWarning("Market chart is null for coin {Id} ({Days}d)", coin.Id, days);
+                                break;
                             }
 
-                            await dbContext.MarketChartDetails.AddRangeAsync(chart);
+                            charts[days] = window;
+                            entity.Charts = charts;
+
                             await dbContext.SaveChangesAsync();
 
-                            _logger.LogInformation("Chart fetched for {Id}", coin.Id);
-                            success = true; // exit the retry loop
+                            _logger.LogInformation("Chart fetched for {Id} ({Days}d)", coin.Id, days);
+                            coinSuccess = true;
                         }
                         catch (HttpRequestException ex) when ((int?)ex.StatusCode == 429)
                         {
-                            _logger.LogWarning("⚠️ Rate limit hit for {Id}. Waiting {Ms}ms then retrying...",
-                                               coin.Id, rateLimitMs);
-
-                            await Task.Delay(rateLimitMs);
-                            // loop continues → retry same coin
+                            _logger.LogWarning(
+                                "⚠️ Rate limit hit for {Id} ({Days}d). Waiting {Ms}ms then retrying...",
+                                coin.Id,
+                                days,
+                                rateLimitMs
+                            );
+                            if (rateLimitMs > 0)
+                            {
+                                await Task.Delay(rateLimitMs);
+                            }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "❌ Error fetching market chart for {Id}", coin.Id);
-                            break; // don't retry non-429 errors
+                            _logger.LogError(ex, "❌ Error fetching market chart for {Id} ({Days}d)", coin.Id, days);
+                            break;
                         }
                     }
 
-                    // Delay before moving to next coin
-                    await Task.Delay(rateLimitMs);
+                    if (!coinSuccess)
+                    {
+                        dayFailed = true;
+                    }
+
+                    if (rateLimitMs > 0)
+                    {
+                        await Task.Delay(rateLimitMs);
+                    }
                 }
 
-
-
-                // If you have a MarketCharts table
-                _logger.LogInformation("🟢 Job terminé avec succès !");
+                return !dayFailed;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "🔴 Erreur dans le job de collecte");
+                return false;
+            }
+        }
+
+        public async Task ExecuteGetHistoryAllAsync()
+        {
+            var daysOptions = (_options.HistoryDaysOptions?.Length > 0
+                    ? _options.HistoryDaysOptions
+                    : new[] { 90 })
+                .Where(d => d > 0)
+                .Distinct()
+                .OrderBy(d => d)
+                .ToArray();
+
+            if (daysOptions.Length == 0)
+            {
+                _logger.LogWarning("No HistoryDaysOptions configured; skipping history collection.");
+                return;
+            }
+
+            foreach (var days in daysOptions)
+            {
+                var attempt = 0;
+                var startedAt = DateTimeOffset.UtcNow;
+                var maxRetryMinutes = _options.HistoryWindowMaxRetryMinutes <= 0 ? 30 : _options.HistoryWindowMaxRetryMinutes;
+                var maxAttempts = _options.HistoryWindowMaxRetryAttempts < 0 ? 0 : _options.HistoryWindowMaxRetryAttempts;
+                while (true)
+                {
+                    attempt++;
+                    var ok = await ExecuteGetHistoryInternalAsync(days);
+                    if (ok)
+                    {
+                        break;
+                    }
+
+                    var elapsed = DateTimeOffset.UtcNow - startedAt;
+                    if (elapsed >= TimeSpan.FromMinutes(maxRetryMinutes))
+                    {
+                        _logger.LogError(
+                            "❌ History window {Days}d still failing after {ElapsedMinutes:N1} minutes ({Attempt} attempts). Stopping history job.",
+                            days,
+                            elapsed.TotalMinutes,
+                            attempt);
+
+                        if (_options.ThrowOnError)
+                        {
+                            throw new InvalidOperationException(
+                                $"History window {days}d failed for more than {maxRetryMinutes} minutes");
+                        }
+
+                        return;
+                    }
+
+                    if (maxAttempts > 0 && attempt >= maxAttempts)
+                    {
+                        _logger.LogError(
+                            "❌ History window {Days}d still failing after {Attempt} attempts. Stopping history job.",
+                            days,
+                            attempt);
+
+                        if (_options.ThrowOnError)
+                        {
+                            throw new InvalidOperationException($"History window {days}d failed after {attempt} attempts");
+                        }
+
+                        return;
+                    }
+
+                    _logger.LogWarning(
+                        "❌ History window {Days}d failed (attempt {Attempt}). Retrying until success...",
+                        days,
+                        attempt);
+
+                    var retryDelayMs = Math.Max(0, Math.Max(_options.HistoryWindowRetryDelayMs, _options.RateLimitMs));
+                    await Task.Delay(retryDelayMs);
+                }
             }
         }
 

@@ -153,24 +153,47 @@ namespace CoinUpAPI.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("MarketCapsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PricesJson")
+                    b.Property<string>("ChartsJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Rank")
                         .HasColumnType("int");
 
-                    b.Property<string>("TotalVolumesJson")
+                    b.HasKey("Id");
+
+                    b.ToTable("MarketChartDetails");
+                });
+
+            modelBuilder.Entity("CoinUpAPI.Models.AlertNotification", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("AlertId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("MarketChartDetails");
+                    b.ToTable("AlertNotifications");
                 });
 
             modelBuilder.Entity("CoinUpAPI.Models.CoinHolding", b =>
@@ -246,6 +269,63 @@ namespace CoinUpAPI.Migrations
                     b.ToTable("PortfolioSnapshots");
                 });
 
+            modelBuilder.Entity("CoinUpAPI.Models.PriceAlert", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal?>("AbovePercentFromBuy")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("AbovePrice")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<decimal?>("BalanceBelow")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<decimal?>("BelowPercentFromBuy")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("BelowPrice")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<string>("CoinId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("CooldownMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastTriggeredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("ThresholdPercent")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ThresholdPrice")
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CoinId", "IsActive");
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("PriceAlerts");
+                });
+
             modelBuilder.Entity("CoinUpAPI.Models.Transaction", b =>
                 {
                     b.Property<string>("Id")
@@ -295,9 +375,21 @@ namespace CoinUpAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasDefaultValue("User");
 
                     b.Property<string>("Username")
                         .IsRequired()

@@ -119,6 +119,115 @@ dotnet run
 4️⃣ Run Angular (in its separate repo)
 ng serve
 
+---
+
+## DevOps & CI/CD (local-first, no online deployment required)
+
+This repository includes:
+
+- **CI pipeline (GitHub Actions)**: build + unit/integration tests + Docker build + **Kubernetes deployment smoke test on Kind**.
+- **Docker Compose**: SQL Server + API + Worker (and optional frontend).
+- **Kubernetes manifests (Minikube/Kind)**: SQL Server + API + Worker + automated DB backups (CronJob).
+- **Observability (Prometheus + Grafana + Alertmanager)** for local monitoring.
+
+### 1) CI/CD (GitHub Actions)
+
+Workflow file:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+What it does:
+
+- `dotnet restore/build/test`
+- Builds Docker images for API and Worker
+- Creates a **Kind** cluster and applies Kubernetes manifests from [k8s/overlays/ci](k8s/overlays/ci)
+- Smoke-tests Swagger JSON (`/swagger/v1/swagger.json`)
+
+> This is a full CI/CD demonstration even if you don’t deploy online.
+
+### 2) Dockerisation complète (local)
+
+Backend (API + Worker + SQL Server):
+
+1) Create a `.env` file at repo root with:
+
+    `MSSQL_SA_PASSWORD=YourStrong!Passw0rd`
+
+2) Start:
+
+    `docker compose up -d --build`
+
+Swagger:
+
+- `http://localhost:5000/swagger`
+
+Frontend (Angular) is not inside this repo.
+
+- Optional compose: [docker-compose.frontend.yml](docker-compose.frontend.yml)
+- Example:
+
+  `FRONTEND_CONTEXT=../CoinUpFront docker compose -f docker-compose.yml -f docker-compose.frontend.yml up -d --build`
+
+### 3) Kubernetes (Minikube/Kind)
+
+Manifests:
+
+- Base: [k8s/base](k8s/base)
+- CI overlay: [k8s/overlays/ci](k8s/overlays/ci)
+
+Local deploy example (Kind/Minikube):
+
+1) Build images:
+
+    `docker build -f CoinUpAPI/Dockerfile -t coinupapi:local .`
+    `docker build -f CoinUpWorkerService/Dockerfile -t coinupworker:local .`
+
+2) Apply:
+
+    `kubectl apply -k k8s/base`
+
+3) Access Swagger:
+
+    `kubectl -n coinup port-forward svc/coinupapi 8080:8080`
+    then open `http://localhost:8080/swagger`
+
+> Note: for real usage, update the secret in [k8s/base/sqlserver.yaml](k8s/base/sqlserver.yaml) (password + connection string).
+
+### 4) Monitoring & observabilité (Prometheus + Grafana)
+
+Local stack:
+
+- [docker-compose.observability.yml](docker-compose.observability.yml)
+
+Run:
+
+`docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d`
+
+Endpoints:
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (default `admin/admin` unless overridden)
+- cAdvisor: `http://localhost:8081`
+
+Alerting:
+
+- Basic rule in [ops/observability/prometheus/alerts.yml](ops/observability/prometheus/alerts.yml)
+
+### 5) Sauvegardes automatiques (DB)
+
+Docker (local loop backup container):
+
+- [docker-compose.backup.yml](docker-compose.backup.yml)
+
+Run:
+
+`docker compose -f docker-compose.yml -f docker-compose.backup.yml up -d`
+
+Kubernetes (CronJob):
+
+- Included in base deploy: [k8s/base/backup-cronjob.yaml](k8s/base/backup-cronjob.yaml)
+- Runs daily at 02:00 and stores `.bak` files on a PVC.
+
 🔗 Related Repositories
 
 Since Angular is NOT inside this repo:

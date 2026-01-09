@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CoinUpAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251204145115_FixAllDecimalPrecision")]
-    partial class FixAllDecimalPrecision
+    [Migration("20251231135716_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -156,20 +156,12 @@ namespace CoinUpAPI.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("MarketCapsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PricesJson")
+                    b.Property<string>("ChartsJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Rank")
                         .HasColumnType("int");
-
-                    b.Property<string>("TotalVolumesJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

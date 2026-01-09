@@ -22,7 +22,7 @@ namespace CoinUpWorkerService.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("CoinUpWorkerService.Models.CoinsMarket", b =>
+            modelBuilder.Entity("CoinUp.Shared.Models.CoinsMarket", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -110,7 +110,7 @@ namespace CoinUpWorkerService.Migrations
                     b.ToTable("CoinsMarket");
                 });
 
-            modelBuilder.Entity("CoinUpWorkerService.Models.CoinsMarketCategory", b =>
+            modelBuilder.Entity("CoinUp.Shared.Models.CoinsMarketCategory", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -148,25 +148,17 @@ namespace CoinUpWorkerService.Migrations
                     b.ToTable("CoinsMarketCategory");
                 });
 
-            modelBuilder.Entity("CoinUpWorkerService.Models.MarketChartDetails", b =>
+            modelBuilder.Entity("CoinUp.Shared.Models.MarketChartDetails", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("MarketCapsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PricesJson")
+                    b.Property<string>("ChartsJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Rank")
                         .HasColumnType("int");
-
-                    b.Property<string>("TotalVolumesJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

@@ -6,9 +6,13 @@ using CoinUpWorkerService.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = Host.CreateApplicationBuilder(args);
-
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure()));
+
+builder.Services.AddOptions<DataCollectionJobOptions>()
+    .Bind(builder.Configuration.GetSection("DataCollectionJob"));
 
 builder.Services.AddHttpClient<IDataCollectorService, CoinCapService>();
 

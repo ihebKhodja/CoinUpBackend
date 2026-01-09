@@ -16,6 +16,11 @@ public class User
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
 
+    [Required]
+    public string Role { get; set; } = "User";
+
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation

@@ -23,7 +23,6 @@ namespace CoinUpAPI.Controllers
         // GET: api/coins
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginatedCoinsResponse))]
-        [HttpGet]
         public async Task<IActionResult> GetAllCoins([FromQuery] string? query, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             var result = await _coinsService.GetAllAsync(query, page, pageSize);
@@ -41,6 +40,23 @@ namespace CoinUpAPI.Controllers
                 return NotFound(new { Message = $"Coin with ID '{id}' not found." });
 
             return Ok(coin);
+        }
+
+
+        // GET: api/coins/{id}/market-chart
+        [HttpGet("{id}/market-chart")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MarketChartDetailsDto))]
+        public async Task<IActionResult> GetMarketChartById(string id)
+        {
+            const int defaultDays = 90;
+
+            var chart = await _coinsService.GetMarketChartAsync(id, defaultDays);
+            if (chart == null)
+            {
+                return NotFound(new { Message = $"Market chart not found for coin '{id}' ({defaultDays}d)." });
+            }
+
+            return Ok(chart);
         }
     }
 

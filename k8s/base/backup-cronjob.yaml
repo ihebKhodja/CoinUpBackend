@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sqlserver-backups
+  namespace: coinup
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqlserver-backup
+  namespace: coinup
+spec:
+  schedule: "0 2 * * *" # daily at 02:00
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: mcr.microsoft.com/mssql-tools
+              env:
+                - name: MSSQL_SERVER
+                  value: sqlserver
+                - name: MSSQL_PORT
+                  value: "1433"
+                - name: MSSQL_DATABASE
+                  value: CoinDB
+                - name: MSSQL_USER
+                  value: sa
+                - name: MSSQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: coinup-secrets
+                      key: MSSQL_SA_PASSWORD
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+              command:
+                - /bin/bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+                  file="/backups/CoinDB_${ts}.bak"
+                  /opt/mssql-tools/bin/sqlcmd -S "${MSSQL_SERVER},${MSSQL_PORT}" -U "${MSSQL_USER}" -P "${MSSQL_PASSWORD}" \
+                    -Q "BACKUP DATABASE [${MSSQL_DATABASE}] TO DISK='${file}' WITH INIT, COMPRESSION"
+                  echo "Backup saved: ${file}"
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: sqlserver-backups

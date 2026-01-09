@@ -62,6 +62,9 @@ namespace CoinUpAPI.Services
             if (user == null)
                 throw new Exception("Invalid credentials");
 
+            if (!user.IsActive)
+                throw new Exception("Account is inactive");
+
             var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
             if (result == PasswordVerificationResult.Failed)
                 throw new Exception("Invalid credentials");
@@ -86,7 +89,8 @@ namespace CoinUpAPI.Services
             {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username)
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+            new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? "User" : user.Role)
         };
 
             var token = new JwtSecurityToken(

@@ -1,12 +1,25 @@
 sequenceDiagram
     participant C as Client
     participant API as AuthController
-    participant S as UserService
-    participant DB as Database
+    participant AS as AuthService
+    participant PH as PasswordHasher
+    participant DB as ApplicationDbContext
 
     C->>API: POST /api/auth/register {username,email,password}
-    API->>S: CreateUser(dto)
-    S->>DB: INSERT User (hash password)
-    DB-->>S: OK (userId)
-    S-->>API: User created
-    API-->>C: 201 Created (maybe return JWT or success)
+    API->>AS: RegisterAsync(dto)
+    AS->>DB: Users.Any(email)
+    alt email already exists
+        DB-->>AS: true
+        AS-->>API: throw "Email already exists"
+        API-->>C: 400 BadRequest {message}
+    else new user
+        DB-->>AS: false
+        AS->>PH: HashPassword(user, password)
+        PH-->>AS: passwordHash
+        AS->>DB: Users.Add(user)
+        AS->>DB: SaveChanges
+        DB-->>AS: user.Id
+        AS->>AS: GenerateJwtToken(user)
+        AS-->>API: AuthResponseDto {token,userId,username,email}
+        API-->>C: 200 OK (AuthResponseDto)
+    end

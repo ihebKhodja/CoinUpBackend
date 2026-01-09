@@ -1,19 +1,30 @@
 sequenceDiagram
     participant C as Client
-    participant API as PortfolioController
-    participant Auth as JwtFilter
+    participant API as WalletController
     participant WS as WalletService
     participant Coin as CoinsService
-    participant DB as Database
+    participant DB as ApplicationDbContext
 
-    C->>API: GET /api/wallet/portfolio
-    API->>Auth: validate token
-    Auth-->>API: userId
-    API->>WS: GetPortfolio(userId)
-    WS->>DB: SELECT Wallet, CoinHoldings WHERE userId
-    DB-->>WS: wallet + holdings
-    WS->>Coin: GetCurrentPrices(list of coinIds)
-    Coin-->>WS: current prices
-    WS->>WS: compute per-holding currentValue, profit, total
-    WS-->>API: portfolio dto
-    API-->>C: 200 {holdings, totalValue, totalProfit}
+    C->>API: GET /api/wallet
+    Note over API: [Authorize] validates JWT before controller
+    API->>API: Extract userId from claims (NameIdentifier or sub)
+    alt missing/invalid userId
+        API-->>C: 401 Unauthorized {message}
+    else userId ok
+        API->>WS: GetWalletAsync(userId)
+        WS->>DB: Load wallet (+holdings + coin) by userId
+        alt wallet missing
+            WS->>DB: Create wallet (Balance=0)
+            WS->>DB: SaveChanges
+        end
+        loop for each holding
+            WS->>Coin: GetCurrentPriceAsync(holding.CoinId)
+            Coin->>DB: Read coin current price (CoinsMarket)
+            DB-->>Coin: price
+            Coin-->>WS: price
+            WS->>WS: holding.CurrentValue = qty * price
+            WS->>WS: holding.Profit = CurrentValue - (AverageBuyPrice * qty)
+        end
+        WS-->>API: EWalletDto {balance, holdings[]}
+        API-->>C: 200 OK (EWalletDto)
+    end

@@ -1,0 +1,21 @@
+  Identification des projets à restaurer...
+  Tous les projets sont à jour pour la restauration.
+  CoinUp.Shared -> C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUp.Shared\bin\Debug\net8.0\CoinUp.Shared.dll
+  CoinUpAPI -> C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpAPI\bin\Debug\net8.0\CoinUpAPI.dll
+  CoinUpAPI.Tests -> C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpAPI\CoinUpAPI.Tests\bin\Debug\net8.0\CoinUpAPI.Tests.dll
+Série de tests pour C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpAPI\CoinUpAPI.Tests\bin\Debug\net8.0\CoinUpAPI.Tests.dll (.NETCoreApp,Version=v8.0)
+Version de VSTest 17.14.1 (x64)
+
+Démarrage de l'exécution de tests, patientez...
+Au total, 1 fichiers de test ont correspondu au modèle spécifié.
+  CoinUpWorkerService -> C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpWorkerService\bin\Debug\net8.0\CoinUpWorkerService.dll
+  CoinUpWorkerService.Tests -> C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpWorkerService\CoinUpWorkerService.Tests\bin\Debug\net8.0\CoinUpWorkerService.Tests.dll
+Série de tests pour C:\Users\Etudiant\source\repos\CoinUpBackend\CoinUpWorkerService\CoinUpWorkerService.Tests\bin\Debug\net8.0\CoinUpWorkerService.Tests.dll (.NETCoreApp,Version=v8.0)
+Version de VSTest 17.14.1 (x64)
+
+Démarrage de l'exécution de tests, patientez...
+Au total, 1 fichiers de test ont correspondu au modèle spécifié.
+
+Réussi!  - échec :     0, réussite :    21, ignorée(s) :     0, total :    21, durée : 19 s - CoinUpAPI.Tests.dll (net8.0)
+
+Réussi!  - échec :     0, réussite :    12, ignorée(s) :     0, total :    12, durée : 9 s - CoinUpWorkerService.Tests.dll (net8.0)

@@ -1,0 +1,25 @@
+# Automatic SQL Server backups (dev-friendly)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.backup.yml up -d
+#
+services:
+  sqlbackup:
+    image: mcr.microsoft.com/mssql-tools
+    depends_on:
+      - sqlserver
+    environment:
+      MSSQL_SERVER: sqlserver
+      MSSQL_PORT: "1433"
+      MSSQL_DATABASE: CoinDB
+      MSSQL_USER: sa
+      MSSQL_PASSWORD: ${MSSQL_SA_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./ops/sqlserver/backup.sh:/backup.sh:ro
+      - sqlserverbackups:/backups
+    entrypoint: ["/bin/bash", "/backup.sh"]
+
+volumes:
+  sqlserverbackups:

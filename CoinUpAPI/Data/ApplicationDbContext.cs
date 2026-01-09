@@ -20,10 +20,22 @@ namespace CoinUpAPI.Data
         public DbSet<WatchlistItem> WatchlistItems { get; set; }
         public DbSet<PortfolioSnapshot> PortfolioSnapshots { get; set; }
 
+        public DbSet<PriceAlert> PriceAlerts { get; set; }
+        public DbSet<AlertNotification> AlertNotifications { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Role)
+                .HasMaxLength(16)
+                .HasDefaultValue("User");
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.IsActive)
+                .HasDefaultValue(true);
 
             // Wallets
             modelBuilder.Entity<EWallet>()
@@ -47,15 +59,70 @@ namespace CoinUpAPI.Data
                 .HasColumnType("decimal(18,8)");
 
             // Market data
-            modelBuilder.Entity<CoinsMarket>()
-                .Property(c => c.Current_Price)
+            modelBuilder.Entity<CoinsMarket>(entity =>
+            {
+                // Prices
+                entity.Property(c => c.Current_Price).HasColumnType("decimal(38,18)");
+                entity.Property(c => c.High_24h).HasColumnType("decimal(38,18)");
+                entity.Property(c => c.Low_24h).HasColumnType("decimal(38,18)");
+                entity.Property(c => c.Price_Change_24h).HasColumnType("decimal(38,18)");
+
+                // Market caps / volumes
+                entity.Property(c => c.Market_Cap).HasColumnType("decimal(38,2)");
+                entity.Property(c => c.Fully_Diluted_Valuation).HasColumnType("decimal(38,2)");
+                entity.Property(c => c.Total_Volume).HasColumnType("decimal(38,2)");
+                entity.Property(c => c.Market_Cap_Change_24h).HasColumnType("decimal(38,2)");
+
+                // Percent changes
+                entity.Property(c => c.Price_Change_Percentage_24h).HasColumnType("decimal(18,8)");
+                entity.Property(c => c.Market_Cap_Change_Percentage_24h).HasColumnType("decimal(18,8)");
+                entity.Property(c => c.Ath_Change_Percentage).HasColumnType("decimal(18,8)");
+                entity.Property(c => c.Atl_Change_Percentage).HasColumnType("decimal(18,8)");
+
+                // Supply
+                entity.Property(c => c.Circulating_Supply).HasColumnType("decimal(38,8)");
+                entity.Property(c => c.Total_Supply).HasColumnType("decimal(38,8)");
+                entity.Property(c => c.Max_Supply).HasColumnType("decimal(38,8)");
+
+                // All-time high / low
+                entity.Property(c => c.Ath).HasColumnType("decimal(38,18)");
+                entity.Property(c => c.Atl).HasColumnType("decimal(38,18)");
+            });
+
+            // Alerts
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.ThresholdPrice)
                 .HasColumnType("decimal(18,8)");
-            modelBuilder.Entity<CoinsMarket>()
-                .Property(c => c.Market_Cap)
-                .HasColumnType("decimal(18,2)");
-            modelBuilder.Entity<CoinsMarket>()
-                .Property(c => c.Total_Volume)
-                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.ThresholdPercent)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.AbovePrice)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BelowPrice)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.AbovePercentFromBuy)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BelowPercentFromBuy)
+                .HasColumnType("decimal(18,4)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .Property(a => a.BalanceBelow)
+                .HasColumnType("decimal(18,8)");
+
+            modelBuilder.Entity<PriceAlert>()
+                .HasIndex(a => new { a.UserId, a.IsActive });
+
+            modelBuilder.Entity<PriceAlert>()
+                .HasIndex(a => new { a.CoinId, a.IsActive });
         }
 
     }
