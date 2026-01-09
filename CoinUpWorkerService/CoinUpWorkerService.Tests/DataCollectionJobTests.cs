@@ -143,6 +143,96 @@ public class DataCollectionJobTests
         Assert.True(failingCollector.Calls >= 2);
     }
 
+    [Fact]
+    public async Task ExecuteGetHistoryAllAsync_CollectsFallbackDaysIncluding90()
+    {
+        var databaseRoot = new InMemoryDatabaseRoot();
+        var databaseName = $"{nameof(ExecuteGetHistoryAllAsync_CollectsFallbackDaysIncluding90)}-{Guid.NewGuid()}";
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName, databaseRoot));
+        services.AddScoped<IDataCollectorService>(_ => new FakeCollectorService());
+        // Note: options default is already {1,7,90}, so we're testing the defaults
+        services.AddOptions<DataCollectionJobOptions>().Configure(o =>
+        {
+            o.RateLimitMs = 0;
+            o.ThrowOnError = true;
+            o.HistoryWindowRetryDelayMs = 0;
+        });
+        services.AddScoped<DataCollectionJob>();
+
+        await using var provider = services.BuildServiceProvider();
+
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            db.CoinsMarket.Add(new CoinsMarket { Id = "bitcoin", Name = "Bitcoin", Symbol = "btc", Rank = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        var job = provider.GetRequiredService<DataCollectionJob>();
+        await job.ExecuteGetHistoryAllAsync();
+
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var entity = await db.MarketChartDetails.FindAsync("bitcoin");
+
+            Assert.NotNull(entity);
+            // Verify all three windows were collected with the defaults
+            Assert.True(entity!.Charts.ContainsKey(1), "1-day window should be persisted");
+            Assert.True(entity!.Charts.ContainsKey(7), "7-day window should be persisted");
+            Assert.True(entity!.Charts.ContainsKey(90), "90-day window should be persisted");
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteGetHistoryAsync_Can_Collect_90Days()
+    {
+        var databaseRoot = new InMemoryDatabaseRoot();
+        var databaseName = $"{nameof(ExecuteGetHistoryAsync_Can_Collect_90Days)}-{Guid.NewGuid()}";
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName, databaseRoot));
+        services.AddScoped<IDataCollectorService>(_ => new FakeCollectorService());
+        services.AddOptions<DataCollectionJobOptions>().Configure(o =>
+        {
+            o.RateLimitMs = 0;
+            o.ThrowOnError = true;
+            o.HistoryWindowRetryDelayMs = 0;
+        });
+        services.AddScoped<DataCollectionJob>();
+
+        await using var provider = services.BuildServiceProvider();
+
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            db.CoinsMarket.Add(new CoinsMarket { Id = "bitcoin", Name = "Bitcoin", Symbol = "btc", Rank = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        var job = provider.GetRequiredService<DataCollectionJob>();
+        await job.ExecuteGetHistoryAsync(days: 90);
+
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var entity = await db.MarketChartDetails.FindAsync("bitcoin");
+
+            Assert.NotNull(entity);
+            Assert.True(entity!.Charts.ContainsKey(90));
+            Assert.Single(entity.Charts[90].Prices);
+            Assert.Equal(123.45m, entity.Charts[90].Prices[0][1]);
+        }
+    }
+
     private sealed class FakeCollectorService : IDataCollectorService
     {
         public Task<List<CoinsMarket>> FetchCoinsMarketAsync()
