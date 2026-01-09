@@ -1,0 +1,76 @@
+name: SonarQube
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Java (required by SonarScanner)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Skip if Sonar secrets missing
+        if: ${{ env.SONAR_HOST_URL == '' || env.SONAR_TOKEN == '' }}
+        run: |
+          echo "Skipping SonarQube analysis: SONAR_HOST_URL and/or SONAR_TOKEN not configured as GitHub secrets."
+          exit 0
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Restore
+        run: dotnet restore CoinUpBackend.sln
+
+      - name: Sonar begin
+        run: |
+          key="${SONAR_PROJECT_KEY:-CoinUpBackend}"
+          dotnet sonarscanner begin \
+            /k:"$key" \
+            /d:sonar.host.url="$SONAR_HOST_URL" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+            /d:sonar.coverage.exclusions="**/*Tests*/**,**/*.Tests/**"
+
+      - name: Build
+        run: dotnet build CoinUpBackend.sln -c Release --no-restore
+
+      - name: Test + coverage (API, OpenCover)
+        run: |
+          dotnet test CoinUpAPI/CoinUpAPI.Tests/CoinUpAPI.Tests.csproj \
+            -c Release --no-build \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=opencover \
+            /p:CoverletOutput=TestResults/coverage.opencover.xml
+
+      - name: Test + coverage (Worker, OpenCover)
+        run: |
+          dotnet test CoinUpWorkerService/CoinUpWorkerService.Tests/CoinUpWorkerService.Tests.csproj \
+            -c Release --no-build \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=opencover \
+            /p:CoverletOutput=TestResults/coverage.opencover.xml
+
+      - name: Sonar end
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
