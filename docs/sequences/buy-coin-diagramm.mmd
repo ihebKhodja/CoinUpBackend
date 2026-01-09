@@ -1,31 +1,39 @@
 sequenceDiagram
     participant C as Client
     participant API as WalletController
-    participant Auth as JwtFilter
     participant WS as WalletService
     participant Coin as CoinsService
-    participant DB as Database
+    participant DB as ApplicationDbContext
+    participant Email as IEmailSender
 
     C->>API: POST /api/wallet/buy {coinId, quantity}
-    API->>Auth: validate token
-    Auth-->>API: userId
-    API->>Coin: GetCurrentPrice(coinId)
-    Coin-->>API: price
-    API->>WS: Buy(userId, coinId, quantity, price)
-    WS->>DB: BeginTransaction
-    WS->>DB: SELECT Wallet WHERE UserId
-    DB-->>WS: wallet
-    WS->>DB: verify wallet.Balance >= price*quantity
-    alt sufficient balance
-        WS->>DB: INSERT/UPDATE CoinHolding (adjust quantity, avg price)
-        WS->>DB: INSERT WalletTransaction (Buy)
-        WS->>DB: UPDATE Wallet SET Balance = Balance - cost
-        DB-->>WS: OK
-        WS->>DB: Commit
-        WS-->>API: success
-        API-->>C: 200 {holding, newBalance}
-    else insufficient
-        WS->>DB: Rollback
-        WS-->>API: error (402 or 400)
-        API-->>C: 400 Insufficient funds
+    Note over API: [Authorize] validates JWT before controller
+    API->>API: Extract userId from claims (NameIdentifier or sub)
+    alt missing/invalid userId
+        API-->>C: 401 Unauthorized {message}
+    else userId ok
+        API->>WS: BuyAsync(userId, dto)
+        WS->>DB: Load wallet (+holdings) by userId
+        alt wallet missing
+            WS->>DB: Create wallet (Balance=0)
+            WS->>DB: SaveChanges
+        end
+        WS->>Coin: GetCurrentPriceAsync(coinId)
+        Coin->>DB: Read coin current price (CoinsMarket)
+        DB-->>Coin: price
+        Coin-->>WS: price
+        WS->>WS: cost = quantity * price
+        alt insufficient balance
+            WS-->>API: throw Exception("Insufficient balance")
+            API-->>C: 500 (unhandled exception by default)
+        else sufficient balance
+            WS->>DB: Update wallet balance
+            WS->>DB: Upsert holding (avg buy price)
+            WS->>DB: Add Transaction (Buy)
+            WS->>DB: SaveChanges
+            WS->>Email: Send wallet email (best-effort)
+            WS->>DB: Check low-balance alerts + write notifications (best-effort)
+            WS-->>API: BuySellResponseDto {type,price,quantity,newBalance}
+            API-->>C: 200 OK (BuySellResponseDto)
+        end
     end

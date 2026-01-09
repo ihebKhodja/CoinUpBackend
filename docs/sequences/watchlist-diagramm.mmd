@@ -1,0 +1,62 @@
+sequenceDiagram
+    participant C as Client
+    participant API as WatchlistController
+    participant WS as WatchlistService
+    participant DB as ApplicationDbContext
+
+    Note over API: [Authorize] validates JWT before controller
+
+    alt GET /api/watchlist
+        C->>API: GET /api/watchlist
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>WS: GetAsync(userId)
+            WS->>DB: SELECT WatchlistItems + Coin WHERE userId
+            DB-->>WS: items
+            WS-->>API: List<WatchlistItemDto>
+            API-->>C: 200 OK (items)
+        end
+    else POST /api/watchlist/{coinId}
+        C->>API: POST /api/watchlist/{coinId}
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>WS: AddAsync(userId, coinId)
+            WS->>DB: Find existing item (userId, coinId)
+            alt already exists
+                DB-->>WS: existing item
+                WS-->>API: WatchlistItemDto
+                API-->>C: 201 Created (CreatedAtAction)
+            else new
+                DB-->>WS: null
+                WS->>DB: INSERT WatchlistItem
+                WS->>DB: SaveChanges
+                WS->>DB: Reload item + Coin
+                WS-->>API: WatchlistItemDto
+                API-->>C: 201 Created (CreatedAtAction)
+            end
+        end
+    else DELETE /api/watchlist/{coinId}
+        C->>API: DELETE /api/watchlist/{coinId}
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>WS: RemoveAsync(userId, coinId)
+            WS->>DB: Find item (userId, coinId)
+            alt not found
+                DB-->>WS: null
+                WS-->>API: null
+                API-->>C: 200 OK {message:"Removed from watchlist."}
+            else found
+                DB-->>WS: item
+                WS->>DB: DELETE WatchlistItem
+                WS->>DB: SaveChanges
+                WS-->>API: WatchlistItemDto
+                API-->>C: 200 OK {message:"Removed from watchlist."}
+            end
+        end
+    end

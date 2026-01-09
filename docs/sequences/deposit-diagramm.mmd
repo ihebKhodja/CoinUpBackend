@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant C as Client
+    participant API as WalletController
+    participant WS as WalletService
+    participant DB as ApplicationDbContext
+
+    C->>API: POST /api/wallet/deposit {amount}
+    Note over API: [Authorize] validates JWT before controller
+
+    alt amount <= 0 or missing
+        API-->>C: 400 BadRequest {message}
+    else valid amount
+        API->>API: Extract userId from claims (NameIdentifier or sub)
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>WS: DepositAsync(userId, amount)
+            WS->>DB: Load wallet by userId
+            alt wallet missing
+                WS->>DB: Create wallet (Balance=0)
+            end
+            WS->>DB: wallet.Balance += amount
+            WS->>DB: SaveChanges
+            WS->>DB: Check low-balance alerts + write notifications (best-effort)
+            WS-->>API: true
+            API-->>C: 200 OK {message:"Deposit successful.", amount}
+        end
+    end

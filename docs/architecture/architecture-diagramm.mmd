@@ -6,23 +6,28 @@ flowchart LR
 
     subgraph API ["Backend API Layer (.NET API)"]
         B["REST API<br/>ASP.NET Core"]
-        C["Authentication<br/>JWT / Identity"]
+        C["Authentication<br/>JWT + PasswordHasher"]
         D["Controllers + Services"]
         E["Database Access<br/>EF Core"]
-    end
-
-    subgraph MESSAGE_BROKER ["Message Broker"]
-        F["RabbitMQ<br/>Exchange + Queues"]
+        K["Hosted Services<br/>AlertEvaluationHostedService"]
+        L["Email Sender<br/>SMTP"]
     end
 
     subgraph WORKER ["Background Processing Layer"]
         G[".NET Worker Service"]
-        H["Jobs: Coin Fetching, Market Data, Scheduler"]
-        I["Consumer: RabbitMQ Subscriber"]
+        H["Jobs: Data Collection + Scheduler"]
+        I["HTTP Client: CoinCap (market data)"]
     end
 
     subgraph DATA ["Data Storage"]
-        J["SQL Database<br/>PostgreSQL / SQLServer"]
+        J["SQL Database<br/>SQL Server"]
+    end
+
+    subgraph OBS ["Observability (optional, docker-compose.observability.yml)"]
+        P["cAdvisor"]
+        Q["Prometheus"]
+        R["Grafana"]
+        S["Alertmanager"]
     end
 
     %% Client → API
@@ -33,17 +38,20 @@ flowchart LR
     B --> D
     D --> E
     E --> J
+    D --> K
+    D --> L
 
-    %% API triggers worker via messages
-    D -->|Publish tasks| F
-
-    %% Worker consumes from RabbitMQ
-    F --> I
-    I --> G
+    %% Worker scheduling + data collection
     G --> H
+    H --> I
 
     %% Worker updates DB
     H --> J
+
+    %% Observability stack
+    Q --> R
+    Q --> S
+    P --> Q
 
     %% API reads updated DB for Angular
     J --> E --> D --> B --> A

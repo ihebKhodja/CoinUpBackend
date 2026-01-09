@@ -1,37 +1,66 @@
 flowchart TB
-    subgraph API ["REST API"]
+    subgraph API ["REST API (CoinUpAPI)"]
         subgraph Auth["AuthController (/api/auth)"]
             A1["POST /register"]
             A2["POST /login"]
-            A3["POST /refresh-token"]
         end
 
-        subgraph Coins["CoinsController (/api/coins)"]
-            C1["GET /"] 
-            C2["GET /:id"]
-            C3["GET /market"] 
-            C4["GET /:id/chart"]
+        subgraph Coins["CoinsController (/api/coins) [Authorize]"]
+            C1["GET /?query=&page=&pageSize="]
+            C2["GET /{id}"]
+            C3["GET /{id}/market-chart (default 90d)"]
         end
 
-        subgraph Wallet["WalletController (/api/wallet)"]
-            W1["GET /portfolio"]
+        subgraph Wallet["WalletController (/api/wallet) [Authorize]"]
+            W0["GET /"]
+            W1["POST /deposit"]
             W2["POST /buy"]
             W3["POST /sell"]
             W4["GET /transactions"]
-            W5["GET /watchlist"]
-            W6["POST /watchlist"]
-            W7["DELETE /watchlist/:id"]
         end
 
-        subgraph Admin["Admin/MarketJobs"]
-            J1["MarketUpdaterService (background)"]
-            J2["MarketChartUpdater"]
+        subgraph Watchlist["WatchlistController (/api/watchlist) [Authorize]"]
+            WL1["GET /"]
+            WL2["POST /{coinId}"]
+            WL3["DELETE /{coinId}"]
+        end
+
+        subgraph Alerts["AlertsController (/api/alerts) [Authorize]"]
+            AL1["GET /"]
+            AL2["POST /"]
+            AL3["PUT /{id}"]
+            AL4["DELETE /{id}"]
+        end
+
+        subgraph Users["UsersController (/api/users) [Authorize + AdminOnly]"]
+            U1["GET /"]
+            U2["PUT /{userId}/is-active"]
+        end
+
+        subgraph Hosted["Hosted Services (internal)"]
+            H1["AlertEvaluationHostedService (periodic)"]
+        end
+
+        subgraph Infra["Infrastructure (internal)"]
+            DB[(SQL Server via EF Core)]
+            Email["IEmailSender (SMTP)"]
         end
     end
 
     Client-->|HTTP|Auth
     Client-->|HTTP|Coins
     Client-->|HTTP|Wallet
-    admin-->J1
-    J1-->Coins
-    J1-->MarketChartDetails
+    Client-->|HTTP|Watchlist
+    Client-->|HTTP|Alerts
+    AdminClient-->|HTTP|Users
+
+    %% Background evaluator reads DB state and sends emails; it does not call controllers.
+    H1-->|read alerts + coins + wallets|DB
+    H1-->|send email notifications|Email
+
+    %% Wallet operations read/write DB and may send best-effort emails.
+    Wallet-->|read/write|DB
+    Wallet-->|send wallet emails best effort|Email
+
+    %% Coins endpoints read from DB tables (CoinsMarket + MarketChartDetails).
+    Coins-->DB

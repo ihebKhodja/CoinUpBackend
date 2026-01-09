@@ -1,30 +1,35 @@
 sequenceDiagram
     participant C as Client
     participant API as WalletController
-    participant Auth as JwtFilter
     participant WS as WalletService
     participant Coin as CoinsService
-    participant DB as Database
+    participant DB as ApplicationDbContext
+    participant Email as IEmailSender
 
     C->>API: POST /api/wallet/sell {coinId, quantity}
-    API->>Auth: validate token
-    Auth-->>API: userId
-    API->>Coin: GetCurrentPrice(coinId)
-    Coin-->>API: price
-    API->>WS: Sell(userId, coinId, quantity, price)
-    WS->>DB: BeginTransaction
-    WS->>DB: SELECT CoinHolding WHERE WalletId AND CoinId
-    DB-->>WS: holding
-    alt holding.Quantity >= quantity
-        WS->>DB: UPDATE CoinHolding (reduce quantity)
-        WS->>DB: INSERT WalletTransaction (Sell)
-        WS->>DB: UPDATE Wallet SET Balance = Balance + proceeds
-        DB-->>WS: OK
-        WS->>DB: Commit
-        WS-->>API: success
-        API-->>C: 200 {holding, newBalance, profit}
-    else not enough coins
-        WS->>DB: Rollback
-        WS-->>API: 400 Not enough coins
-        API-->>C: 400
+    Note over API: [Authorize] validates JWT before controller
+    API->>API: Extract userId from claims (NameIdentifier or sub)
+    alt missing/invalid userId
+        API-->>C: 401 Unauthorized {message}
+    else userId ok
+        API->>WS: SellAsync(userId, dto)
+        WS->>DB: Load wallet (+holdings) by userId
+        WS->>WS: Find holding by coinId
+        alt holding missing or quantity too low
+            WS-->>API: throw Exception("Not enough coins to sell")
+            API-->>C: 500 (unhandled exception by default)
+        else can sell
+            WS->>Coin: GetCurrentPriceAsync(coinId)
+            Coin->>DB: Read coin current price (CoinsMarket)
+            DB-->>Coin: price
+            Coin-->>WS: price
+            WS->>DB: Reduce/remove holding
+            WS->>DB: Update wallet balance
+            WS->>DB: Add Transaction (Sell)
+            WS->>DB: SaveChanges
+            WS->>Email: Send wallet email (best-effort)
+            WS->>DB: Check low-balance alerts + write notifications (best-effort)
+            WS-->>API: BuySellResponseDto {type,price,quantity,newBalance}
+            API-->>C: 200 OK (BuySellResponseDto)
+        end
     end

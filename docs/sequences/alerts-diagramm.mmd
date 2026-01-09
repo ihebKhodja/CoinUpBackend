@@ -1,0 +1,84 @@
+sequenceDiagram
+    participant C as Client
+    participant API as AlertsController
+    participant AS as AlertsService
+    participant DB as ApplicationDbContext
+
+    Note over API: [Authorize] validates JWT before controller
+
+    alt GET /api/alerts
+        C->>API: GET /api/alerts
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>AS: GetMyAlertsAsync(userId)
+            AS->>DB: SELECT PriceAlerts WHERE userId
+            DB-->>AS: alerts
+            AS-->>API: List<PriceAlertDto>
+            API-->>C: 200 OK (alerts)
+        end
+
+    else POST /api/alerts
+        C->>API: POST /api/alerts (CreatePriceAlertDto)
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>AS: CreateAsync(userId, dto)
+            AS->>DB: Validate scope (watchlist/holdings/balance)
+            alt validation fails
+                AS-->>API: throw ArgumentException
+                API-->>C: 400 BadRequest {message}
+            else ok
+                AS->>DB: INSERT PriceAlert
+                AS->>DB: SaveChanges
+                AS-->>API: PriceAlertDto
+                API-->>C: 200 OK (PriceAlertDto)
+            end
+        end
+
+    else PUT /api/alerts/{id}
+        C->>API: PUT /api/alerts/{id} (UpdatePriceAlertDto)
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>AS: UpdateAsync(userId, id, dto)
+            AS->>DB: Load alert by id + userId
+            alt alert not found
+                AS-->>API: throw KeyNotFoundException
+                API-->>C: 404 NotFound {message}
+            else found
+                AS->>DB: Validate updated scope
+                alt validation fails
+                    AS-->>API: throw ArgumentException
+                    API-->>C: 400 BadRequest {message}
+                else ok
+                    AS->>DB: Update fields
+                    AS->>DB: SaveChanges
+                    AS-->>API: PriceAlertDto
+                    API-->>C: 200 OK (PriceAlertDto)
+                end
+            end
+        end
+
+    else DELETE /api/alerts/{id}
+        C->>API: DELETE /api/alerts/{id}
+        API->>API: Extract userId from claims
+        alt missing/invalid userId
+            API-->>C: 401 Unauthorized {message}
+        else userId ok
+            API->>AS: DeleteAsync(userId, id)
+            AS->>DB: Load alert by id + userId
+            alt alert not found
+                AS-->>API: throw KeyNotFoundException
+                API-->>C: 404 NotFound {message}
+            else found
+                AS->>DB: DELETE PriceAlert
+                AS->>DB: SaveChanges
+                AS-->>API: OK
+                API-->>C: 200 OK {message:"Deleted"}
+            end
+        end
+    end
