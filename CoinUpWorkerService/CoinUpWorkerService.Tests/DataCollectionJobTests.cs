@@ -89,7 +89,7 @@ public class DataCollectionJobTests
         }
 
         var job = provider.GetRequiredService<DataCollectionJob>();
-        await job.ExecuteGetHistoryAsync(days: 7);
+        await job.ExecuteGetHistoryAsync(days: 90);
 
         using (var scope = provider.CreateScope())
         {
@@ -97,9 +97,9 @@ public class DataCollectionJobTests
             var entity = await db.MarketChartDetails.FindAsync("bitcoin");
 
             Assert.NotNull(entity);
-            Assert.True(entity!.Charts.ContainsKey(7));
-            Assert.Single(entity.Charts[7].Prices);
-            Assert.Equal(123.45m, entity.Charts[7].Prices[0][1]);
+            Assert.True(entity!.Charts.ContainsKey(90));
+            Assert.Single(entity.Charts[90].Prices);
+            Assert.Equal(123.45m, entity.Charts[90].Prices[0][1]);
         }
     }
 
@@ -122,7 +122,7 @@ public class DataCollectionJobTests
             o.HistoryWindowRetryDelayMs = 0;
             o.HistoryWindowMaxRetryMinutes = 30;
             o.HistoryWindowMaxRetryAttempts = 2;
-            o.HistoryDaysOptions = new[] { 7 };
+            o.HistoryDaysOptions = new[] { 90 };
         });
         services.AddScoped<DataCollectionJob>();
 
@@ -144,16 +144,16 @@ public class DataCollectionJobTests
     }
 
     [Fact]
-    public async Task ExecuteGetHistoryAllAsync_CollectsFallbackDaysIncluding90()
+    public async Task ExecuteGetHistoryAllAsync_CollectsDefaultDaysOnly90()
     {
         var databaseRoot = new InMemoryDatabaseRoot();
-        var databaseName = $"{nameof(ExecuteGetHistoryAllAsync_CollectsFallbackDaysIncluding90)}-{Guid.NewGuid()}";
+        var databaseName = $"{nameof(ExecuteGetHistoryAllAsync_CollectsDefaultDaysOnly90)}-{Guid.NewGuid()}";
 
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName, databaseRoot));
         services.AddScoped<IDataCollectorService>(_ => new FakeCollectorService());
-        // Note: options default is already {1,7,90}, so we're testing the defaults
+        // Note: options default is 90 days only, so we're testing the defaults
         services.AddOptions<DataCollectionJobOptions>().Configure(o =>
         {
             o.RateLimitMs = 0;
@@ -182,9 +182,6 @@ public class DataCollectionJobTests
             var entity = await db.MarketChartDetails.FindAsync("bitcoin");
 
             Assert.NotNull(entity);
-            // Verify all three windows were collected with the defaults
-            Assert.True(entity!.Charts.ContainsKey(1), "1-day window should be persisted");
-            Assert.True(entity!.Charts.ContainsKey(7), "7-day window should be persisted");
             Assert.True(entity!.Charts.ContainsKey(90), "90-day window should be persisted");
         }
     }

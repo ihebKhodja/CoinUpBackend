@@ -28,7 +28,7 @@ public class MarketChartDetailsPersistenceTests
 
             entity.Charts = new Dictionary<int, MarketChartWindow>
             {
-                [7] = new MarketChartWindow
+                [90] = new MarketChartWindow
                 {
                     Prices = new() { new() { 1m, 42m } }
                 }
@@ -41,8 +41,8 @@ public class MarketChartDetailsPersistenceTests
         await using (var db = new ChartsDbContext(options))
         {
             var loaded = await db.MarketChartDetails.SingleAsync(x => x.Id == "bitcoin");
-            Assert.True(loaded.Charts.ContainsKey(7));
-            Assert.Equal(42m, loaded.Charts[7].Prices[0][1]);
+            Assert.True(loaded.Charts.ContainsKey(90));
+            Assert.Equal(42m, loaded.Charts[90].Prices[0][1]);
         }
     }
 
